@@ -1,127 +1,96 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { uploadDocument } from "@/lib/api";
+import HealthBadge from "@/components/HealthBadge";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-type ServiceStatus = { ok: boolean; detail: string };
-type Health = {
-  status: string;
-  llm: ServiceStatus;
-  chroma: ServiceStatus;
-};
-
-function StatusBadge({ ok }: { ok: boolean }) {
-  return (
-    <span
-      className={`inline-block h-3 w-3 rounded-full ${
-        ok ? "bg-emerald-400" : "bg-rose-500"
-      }`}
-    />
-  );
-}
+const ACCEPT = ".pdf,.docx,.txt";
 
 export default function Home() {
-  const [health, setHealth] = useState<Health | null>(null);
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ping, setPing] = useState<string>("");
-  const [pinging, setPinging] = useState(false);
 
-  async function loadHealth() {
+  async function handleFile(file: File) {
     setError(null);
+    setBusy(true);
     try {
-      const res = await fetch(`${API_URL}/health`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setHealth(await res.json());
+      const res = await uploadDocument(file);
+      router.push(`/analyze/${res.id}`);
     } catch (e) {
-      setError(String(e));
-      setHealth(null);
+      setError(String(e instanceof Error ? e.message : e));
+      setBusy(false);
     }
   }
 
-  useEffect(() => {
-    loadHealth();
-  }, []);
-
-  async function doPing() {
-    setPinging(true);
-    setPing("");
-    try {
-      const res = await fetch(`${API_URL}/llm/ping`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "Merhaba, kendini bir cümlede tanıt." }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setPing(`(${data.model}) ${data.reply}`);
-    } catch (e) {
-      setPing(`Hata: ${e}`);
-    } finally {
-      setPinging(false);
-    }
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) handleFile(file);
   }
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-4xl font-bold tracking-tight">Anlattım</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-4xl font-bold tracking-tight">Anlattım</h1>
+        <HealthBadge />
+      </div>
       <p className="mt-2 text-slate-400">
-        Türkçe sözleşmelerini sade dille anlatan, %100 lokal yapay zeka.
+        Sözleşmeni yükle; sade Türkçeyle ne imzaladığını anlatalım. Belgen
+        bilgisayarından dışarı çıkmaz.
       </p>
 
-      <section className="mt-10 rounded-xl border border-slate-700 bg-slate-900/50 p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Servis Durumu</h2>
-          <button
-            onClick={loadHealth}
-            className="rounded-md border border-slate-600 px-3 py-1 text-sm hover:bg-slate-800"
-          >
-            Yenile
-          </button>
-        </div>
-
-        {error && (
-          <p className="mt-4 text-rose-400">
-            Backend&apos;e ulaşılamadı: {error}
-          </p>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => inputRef.current?.click()}
+        className={`mt-10 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-16 text-center transition ${
+          dragging
+            ? "border-emerald-400 bg-emerald-400/5"
+            : "border-slate-700 hover:border-slate-500"
+        } ${busy ? "pointer-events-none opacity-60" : ""}`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPT}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFile(file);
+          }}
+        />
+        {busy ? (
+          <p className="text-slate-300">Yükleniyor ve metin çıkarılıyor…</p>
+        ) : (
+          <>
+            <p className="text-lg font-medium">
+              Sözleşmeni buraya sürükle ya da tıklayıp seç
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              PDF, DOCX veya TXT · en fazla 20 MB
+            </p>
+          </>
         )}
+      </div>
 
-        {health && (
-          <ul className="mt-4 space-y-3">
-            <li className="flex items-center gap-3">
-              <StatusBadge ok={health.status === "ok"} />
-              <span className="font-medium">Genel:</span>
-              <span className="text-slate-300">{health.status}</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <StatusBadge ok={health.llm.ok} />
-              <span className="font-medium">LM Studio:</span>
-              <span className="text-slate-400">{health.llm.detail}</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <StatusBadge ok={health.chroma.ok} />
-              <span className="font-medium">ChromaDB:</span>
-              <span className="text-slate-400">{health.chroma.detail}</span>
-            </li>
-          </ul>
-        )}
-      </section>
+      {error && (
+        <p className="mt-4 rounded-md bg-rose-500/10 p-3 text-sm text-rose-300">
+          {error}
+        </p>
+      )}
 
-      <section className="mt-6 rounded-xl border border-slate-700 bg-slate-900/50 p-6">
-        <h2 className="text-lg font-semibold">LLM Bağlantı Testi</h2>
-        <button
-          onClick={doPing}
-          disabled={pinging}
-          className="mt-4 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {pinging ? "Soruluyor…" : "Modele “Merhaba” de"}
-        </button>
-        {ping && (
-          <p className="mt-4 whitespace-pre-wrap rounded-md bg-slate-950 p-4 text-sm text-slate-200">
-            {ping}
-          </p>
-        )}
-      </section>
+      <p className="mt-8 text-xs text-slate-600">
+        Anlattım yasal tavsiye vermez; çıktılar bilgilendirme amaçlıdır.
+      </p>
     </main>
   );
 }

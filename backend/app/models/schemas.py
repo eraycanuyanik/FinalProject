@@ -20,3 +20,29 @@ class PingRequest(BaseModel):
 class PingResponse(BaseModel):
     model: str
     reply: str
+
+
+class UploadResponse(BaseModel):
+    id: str
+    filename: str
+    method: str
+    pages: int
+    ocr_used: bool
+    char_count: int
+    text_preview: str
+
+
+class DocumentResponse(BaseModel):
+    id: str
+    filename: str
+    method: str
+    pages: int
+    ocr_used: bool
+    char_count: int
+    text: str
+    summary: str | None = None
+
+
+class SummaryResponse(BaseModel):
+    id: str
+    summary: str

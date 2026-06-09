@@ -6,11 +6,14 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
 
+# --- Phase 2: document processing ---
+python-multipart==0.0.20        # file uploads
+pdfplumber==0.11.5              # PDF text extraction
+python-docx==1.1.2              # DOCX extraction
+pytesseract==0.3.13            # OCR fallback (scanned PDFs)
+pdf2image==1.17.0              # PDF page -> image for OCR
+
 # --- Later phases (kept here so the image is built once). Commented until used. ---
-# python-multipart==0.0.20      # file uploads (Phase 2)
-# pdfplumber==0.11.5            # PDF text extraction (Phase 2)
-# python-docx==1.1.2            # DOCX extraction (Phase 2)
-# pytesseract==0.3.13           # OCR fallback (Phase 2)
 # sentence-transformers==3.3.1  # embeddings (Phase 4)
 # chromadb==0.5.23              # vector store client (Phase 4)
 # beautifulsoup4==4.12.3        # mevzuat scraping (Phase 4)

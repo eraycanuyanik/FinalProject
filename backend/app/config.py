@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     # LLM (host üzerindeki LM Studio, OpenAI uyumlu API)
     llm_base_url: str = "http://host.docker.internal:1234/v1"
     llm_api_key: str = "lm-studio"
-    llm_model: str = "google/gemma-4-e4b"
-    llm_request_timeout: float = 120.0
+    llm_model: str = "qwen2.5-coder-7b-instruct-mlx"
+    llm_request_timeout: float = 300.0
 
     # Embeddings
     embedding_model: str = "intfloat/multilingual-e5-large"

@@ -32,16 +32,23 @@ class LLMClient:
         self,
         messages: list[dict[str, str]],
         temperature: float = 0.2,
-        json_mode: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
-        """Sohbet tamamlama. json_mode=True ise modelden JSON üretmesi istenir."""
+        """Sohbet tamamlama.
+
+        json_schema verilirse model yanıtı o JSON şemasına uymaya zorlanır
+        (LM Studio "json_schema" response_format — Faz 3 yapısal çıktı için).
+        """
         payload: dict = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
         }
-        if json_mode:
-            payload["response_format"] = {"type": "json_object"}
+        if json_schema is not None:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "response", "strict": True, "schema": json_schema},
+            }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(

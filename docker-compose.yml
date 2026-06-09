@@ -13,8 +13,8 @@ services:
     environment:
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
       LLM_API_KEY: ${LLM_API_KEY:-lm-studio}
-      LLM_MODEL: ${LLM_MODEL:-google/gemma-4-e4b}
-      LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-120}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder-7b-instruct-mlx}
+      LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-300}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
       HF_HOME: /app/hf_cache
       CHROMA_HOST: chromadb

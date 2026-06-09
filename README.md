@@ -27,7 +27,7 @@ referansla uyarır.
 
 | Katman | Teknoloji |
 |--------|-----------|
-| LLM (lokal) | LM Studio + `google/gemma-4-e4b` (Türkçe için güçlü) |
+| LLM (lokal) | LM Studio + `qwen2.5-coder-7b-instruct-mlx` (varsayılan) |
 | Embeddings | `sentence-transformers` + `intfloat/multilingual-e5-large` |
 | Vector DB | ChromaDB (persist) |
 | Backend | Python 3.11 + FastAPI |
@@ -35,7 +35,10 @@ referansla uyarır.
 | Container | Docker + docker-compose |
 
 ### Modeller neden bu?
-- **gemma-4-e4b**: Türkçe metinde güçlü, 8 GB RAM'le çalışabilir, LM Studio'da hazır.
+- **qwen2.5-coder-7b (varsayılan)**: MLX hızlandırmalı, akıl yürütme (reasoning)
+  üretmediği için hızlı (~45-78 sn) ve Türkçe özetlemede temiz/doğru sonuç verir.
+- **google/gemma-4-e4b (alternatif)**: Türkçesi biraz daha doğal ama akıl yürütme
+  token'ları nedeniyle ~2x yavaş (~150 sn). `.env` içinde `LLM_MODEL` ile geçilebilir.
 - **multilingual-e5-large**: Türkçe destekli, lokal embedding üretir; RAG kalitesi yüksek.
 
 ---
@@ -51,7 +54,7 @@ referansla uyarır.
 
 ### Ön koşullar
 1. **Docker Desktop** kurulu ve çalışıyor.
-2. **LM Studio** kurulu; içinde `google/gemma-4-e4b` modeli indirilmiş ve
+2. **LM Studio** kurulu; içinde `qwen2.5-coder-7b-instruct-mlx` modeli indirilmiş ve
    **Local Server** başlatılmış (varsayılan port `1234`).
 
 ### Adımlar
@@ -76,7 +79,8 @@ her şey hazır. **"Modele Merhaba de"** butonu ile LLM bağlantısını test ed
 ## Geliştirme Yol Haritası (Fazlar)
 
 - [x] **Faz 1 — İskelet:** docker-compose, `/health`, LM Studio bağlantı testi, boş UI.
-- [ ] **Faz 2 — Belge işleme:** PDF/DOCX/TXT yükleme, metin çıkarma, özetleme.
+- [x] **Faz 2 — Belge işleme:** PDF/DOCX/TXT yükleme (drag-drop), metin çıkarma
+      (OCR fallback ile), tek-prompt özetleme, "ham metin | özet" görüntüleyici.
 - [ ] **Faz 3 — Risk pipeline:** madde segmentasyonu, risk skorlama, highlight.
 - [ ] **Faz 4 — RAG:** mevzuat.gov.tr korpusu, ChromaDB, yasa referansları.
 - [ ] **Faz 5 — Chat:** belge bağlamında soru-cevap.
@@ -93,6 +97,17 @@ docker compose exec backend pytest
 # Sadece backend loglarını izle
 docker compose logs -f backend
 ```
+
+### Sorun giderme
+- **Frontend "Module not found" hatası (bağımlılık ekledikten sonra):** Next.js
+  `node_modules` anonim bir volume'da tutulur ve image yeniden build edilse de eski
+  kalabilir. Çözüm:
+  ```bash
+  docker compose up -d --build --renew-anon-volumes frontend
+  ```
+- **Özetleme zaman aşımına uğruyor:** Çok büyük/yavaş bir model kullanıyorsanız
+  `.env` içindeki `LLM_REQUEST_TIMEOUT` değerini artırın ya da daha hızlı bir modele
+  (`qwen2.5-coder-7b-instruct-mlx`) geçin.
 
 | Servis | Host portu |
 |--------|-----------|
