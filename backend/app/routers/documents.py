@@ -2,6 +2,8 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models.schemas import (
+    AnalyzeResponse,
+    ClauseRisk,
     DocumentResponse,
     SummaryResponse,
     UploadResponse,
@@ -12,6 +14,7 @@ from app.services.extractor import (
     UnsupportedFileType,
     extract_text,
 )
+from app.services.risk import analyze_document
 from app.services.summarizer import summarize_document
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -76,6 +79,7 @@ async def get_document(doc_id: str) -> DocumentResponse:
         char_count=doc.char_count,
         text=doc.text,
         summary=doc.summary,
+        analyzed=doc.analysis is not None,
     )
 
 
@@ -98,6 +102,29 @@ async def summarize(doc_id: str) -> SummaryResponse:
 
     document_store.set_summary(doc.id, summary)
     return SummaryResponse(id=doc.id, summary=summary)
+
+
+@router.post("/{doc_id}/analyze", response_model=AnalyzeResponse)
+async def analyze(doc_id: str) -> AnalyzeResponse:
+    doc = document_store.get(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Belge bulunamadı.")
+
+    # Önceden analiz edildiyse tekrar üretmeyelim.
+    if doc.analysis is not None:
+        clauses = [ClauseRisk(**c) for c in doc.analysis]
+        return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
+
+    try:
+        analysis = await analyze_document(doc.text)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=502, detail=f"Risk analizi hatası: {exc}"
+        ) from exc
+
+    document_store.set_analysis(doc.id, analysis)
+    clauses = [ClauseRisk(**c) for c in analysis]
+    return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
 
 
 @router.delete("/{doc_id}")

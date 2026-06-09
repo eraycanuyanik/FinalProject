@@ -20,6 +20,26 @@ export type DocumentResponse = {
   char_count: number;
   text: string;
   summary: string | null;
+  analyzed: boolean;
+};
+
+export type ClauseRisk = {
+  index: number;
+  label: string;
+  text: string;
+  start: number;
+  end: number;
+  ozet: string;
+  risk_skoru: number;
+  risk_turu: string;
+  aciklama: string;
+  taraf: string;
+};
+
+export type AnalyzeResponse = {
+  id: string;
+  clause_count: number;
+  clauses: ClauseRisk[];
 };
 
 export async function uploadDocument(file: File): Promise<UploadResponse> {
@@ -52,4 +72,15 @@ export async function summarizeDocument(id: string): Promise<string> {
   }
   const data = await res.json();
   return data.summary as string;
+}
+
+export async function analyzeDocument(id: string): Promise<AnalyzeResponse> {
+  const res = await fetch(`${API_URL}/documents/${id}/analyze`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
 }

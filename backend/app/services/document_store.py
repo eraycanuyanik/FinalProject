@@ -20,6 +20,7 @@ class StoredDocument:
     ocr_used: bool
     char_count: int
     summary: str | None = field(default=None)
+    analysis: list[dict] | None = field(default=None)
 
 
 class DocumentStore:
@@ -52,6 +53,11 @@ class DocumentStore:
         with self._lock:
             if doc_id in self._docs:
                 self._docs[doc_id].summary = summary
+
+    def set_analysis(self, doc_id: str, analysis: list[dict]) -> None:
+        with self._lock:
+            if doc_id in self._docs:
+                self._docs[doc_id].analysis = analysis
 
     def delete(self, doc_id: str) -> bool:
         with self._lock:

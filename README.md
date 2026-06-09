@@ -81,7 +81,9 @@ her şey hazır. **"Modele Merhaba de"** butonu ile LLM bağlantısını test ed
 - [x] **Faz 1 — İskelet:** docker-compose, `/health`, LM Studio bağlantı testi, boş UI.
 - [x] **Faz 2 — Belge işleme:** PDF/DOCX/TXT yükleme (drag-drop), metin çıkarma
       (OCR fallback ile), tek-prompt özetleme, "ham metin | özet" görüntüleyici.
-- [ ] **Faz 3 — Risk pipeline:** madde segmentasyonu, risk skorlama, highlight.
+- [x] **Faz 3 — Risk pipeline:** madde segmentasyonu (regex + paragraf fallback),
+      madde başına yapısal risk skoru/türü/açıklaması (JSON schema), belgede renk
+      kodlu highlight + hover açıklama balonu, riskli maddeler listesi.
 - [ ] **Faz 4 — RAG:** mevzuat.gov.tr korpusu, ChromaDB, yasa referansları.
 - [ ] **Faz 5 — Chat:** belge bağlamında soru-cevap.
 - [ ] **Faz 6 — Polish:** hata yönetimi, responsive, demo, doğruluk ölçümü.

@@ -41,8 +41,28 @@ class DocumentResponse(BaseModel):
     char_count: int
     text: str
     summary: str | None = None
+    analyzed: bool = False
 
 
 class SummaryResponse(BaseModel):
     id: str
     summary: str
+
+
+class ClauseRisk(BaseModel):
+    index: int
+    label: str
+    text: str
+    start: int
+    end: int
+    ozet: str
+    risk_skoru: int
+    risk_turu: str
+    aciklama: str
+    taraf: str
+
+
+class AnalyzeResponse(BaseModel):
+    id: str
+    clause_count: int
+    clauses: list[ClauseRisk]
