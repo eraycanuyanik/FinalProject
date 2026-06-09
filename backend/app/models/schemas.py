@@ -49,6 +49,14 @@ class SummaryResponse(BaseModel):
     summary: str
 
 
+class LawReference(BaseModel):
+    kanun_adi: str
+    kanun_no: int | str = ""
+    madde_no: str = ""
+    snippet: str = ""
+    distance: float = 0.0
+
+
 class ClauseRisk(BaseModel):
     index: int
     label: str
@@ -60,6 +68,7 @@ class ClauseRisk(BaseModel):
     risk_turu: str
     aciklama: str
     taraf: str
+    references: list[LawReference] = []
 
 
 class AnalyzeResponse(BaseModel):

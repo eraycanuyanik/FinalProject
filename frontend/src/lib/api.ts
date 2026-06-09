@@ -23,6 +23,14 @@ export type DocumentResponse = {
   analyzed: boolean;
 };
 
+export type LawReference = {
+  kanun_adi: string;
+  kanun_no: number | string;
+  madde_no: string;
+  snippet: string;
+  distance: number;
+};
+
 export type ClauseRisk = {
   index: number;
   label: string;
@@ -34,6 +42,7 @@ export type ClauseRisk = {
   risk_turu: string;
   aciklama: string;
   taraf: string;
+  references: LawReference[];
 };
 
 export type AnalyzeResponse = {

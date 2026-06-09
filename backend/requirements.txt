@@ -13,8 +13,10 @@ python-docx==1.1.2              # DOCX extraction
 pytesseract==0.3.13            # OCR fallback (scanned PDFs)
 pdf2image==1.17.0              # PDF page -> image for OCR
 
-# --- Later phases (kept here so the image is built once). Commented until used. ---
-# sentence-transformers==3.3.1  # embeddings (Phase 4)
+# --- Phase 4: RAG (Türk hukuku referansları) ---
+sentence-transformers==3.3.1    # embeddings (intfloat/multilingual-e5-large)
+chromadb==0.5.23                # vector store client (server ile aynı sürüm)
+beautifulsoup4==4.12.3          # mevzuat HTML fallback (opsiyonel)
 # chromadb==0.5.23              # vector store client (Phase 4)
 # beautifulsoup4==4.12.3        # mevzuat scraping (Phase 4)
 

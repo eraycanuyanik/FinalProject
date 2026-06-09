@@ -74,6 +74,22 @@ docker compose up --build
 Ana sayfadaki **Servis Durumu** panelinde LM Studio ve ChromaDB yeşil yanıyorsa
 her şey hazır. **"Modele Merhaba de"** butonu ile LLM bağlantısını test edebilirsiniz.
 
+### RAG korpusunu oluşturma (Türk hukuku referansları — bir kerelik)
+Risk analizinin ilgili kanun maddelerine atıf yapabilmesi için mevzuat korpusunu
+indekslemek gerekir. Servisler ayaktayken:
+```bash
+# 1) Kanun PDF'lerini mevzuat.gov.tr'den indir (TBK, İş K., Tüketici K.)
+docker compose exec backend python scripts/scrape_mevzuat.py
+
+# 2) Maddelere böl, embed et, ChromaDB'ye yükle (embedding modeli ilk seferde ~2GB iner)
+docker compose exec backend python scripts/build_rag.py
+
+# 3) Kaç madde indekslendiğini kontrol et
+curl http://localhost:8000/rag/status
+```
+> Bu adım internet gerektirir (sadece korpus indirme + embedding modeli). İndeksleme
+> bittikten sonra uygulama tamamen offline çalışır; korpus `data/chroma`'da kalıcıdır.
+
 ---
 
 ## Geliştirme Yol Haritası (Fazlar)
@@ -84,7 +100,9 @@ her şey hazır. **"Modele Merhaba de"** butonu ile LLM bağlantısını test ed
 - [x] **Faz 3 — Risk pipeline:** madde segmentasyonu (regex + paragraf fallback),
       madde başına yapısal risk skoru/türü/açıklaması (JSON schema), belgede renk
       kodlu highlight + hover açıklama balonu, riskli maddeler listesi.
-- [ ] **Faz 4 — RAG:** mevzuat.gov.tr korpusu, ChromaDB, yasa referansları.
+- [x] **Faz 4 — RAG:** mevzuat.gov.tr konsolide PDF'leri (TBK/İş/Tüketici) → madde
+      bazlı parçalama → e5-large embedding → ChromaDB (876 madde). Risk analizinde
+      her maddeye ilgili kanun maddesi referansı eklenir.
 - [ ] **Faz 5 — Chat:** belge bağlamında soru-cevap.
 - [ ] **Faz 6 — Polish:** hata yönetimi, responsive, demo, doğruluk ölçümü.
 

@@ -45,6 +45,22 @@ function ClauseBlock({ clause }: { clause: ClauseRisk }) {
             {clause.aciklama}
           </p>
         )}
+        {clause.references?.length > 0 && (
+          <div className="mt-2 border-t border-slate-700 pt-2">
+            <p className="mb-1 text-xs font-semibold text-slate-400">
+              İlgili mevzuat
+            </p>
+            <ul className="space-y-0.5">
+              {clause.references.slice(0, 3).map((r, i) => (
+                <li key={i} className="text-xs text-slate-400">
+                  <span className="text-emerald-300">
+                    {r.kanun_adi} m.{r.madde_no}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

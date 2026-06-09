@@ -5,6 +5,7 @@ import json
 
 from app.prompts.risk_assess import RISK_SCHEMA, build_messages
 from app.services.llm import llm_client
+from app.services.rag import retrieve
 from app.services.segmenter import Clause, segment
 
 # Tek bir maddenin LLM'e gönderilen maksimum uzunluğu.
@@ -20,9 +21,11 @@ def _safe_int(value, default: int = 0) -> int:
 
 async def _assess_clause(clause: Clause) -> dict:
     text = clause.text[:_MAX_CLAUSE_CHARS]
+    # RAG: maddeyle ilgili kanun maddelerini getir (varsa).
+    references = retrieve(text, k=3)
     try:
         raw = await llm_client.chat(
-            build_messages(text), temperature=0.1, json_schema=RISK_SCHEMA
+            build_messages(text, references), temperature=0.1, json_schema=RISK_SCHEMA
         )
         data = json.loads(raw)
         return {
@@ -31,6 +34,7 @@ async def _assess_clause(clause: Clause) -> dict:
             "risk_turu": str(data.get("risk_turu", "standart")).strip() or "standart",
             "aciklama": str(data.get("aciklama", "")).strip(),
             "taraf": str(data.get("taraf", "notr")).strip() or "notr",
+            "references": references,
         }
     except Exception as exc:  # noqa: BLE001 — bir madde patlarsa pipeline durmasın
         return {
@@ -39,6 +43,7 @@ async def _assess_clause(clause: Clause) -> dict:
             "risk_turu": "değerlendirilemedi",
             "aciklama": f"Bu madde otomatik değerlendirilemedi: {exc}",
             "taraf": "notr",
+            "references": references,
         }
 
 

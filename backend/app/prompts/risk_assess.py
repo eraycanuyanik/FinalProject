@@ -34,11 +34,35 @@ USER_TEMPLATE = """Aşağıdaki sözleşme maddesini değerlendir:
 \"\"\"
 {clause_text}
 \"\"\"
-"""
+{context_block}"""
+
+CONTEXT_HEADER = """
+
+İlgili Türk mevzuatı (referans için — uygunsa açıklamanda ilgili kanun ve madde \
+numarasını an):
+{references}"""
 
 
-def build_messages(clause_text: str) -> list[dict[str, str]]:
+def _format_references(references: list[dict]) -> str:
+    if not references:
+        return ""
+    lines = []
+    for r in references:
+        lines.append(
+            f"- {r.get('kanun_adi', '')} (No {r.get('kanun_no', '')}) "
+            f"Madde {r.get('madde_no', '')}: {r.get('snippet', '')[:300]}"
+        )
+    return CONTEXT_HEADER.format(references="\n".join(lines))
+
+
+def build_messages(clause_text: str, references: list[dict] | None = None) -> list[dict[str, str]]:
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": USER_TEMPLATE.format(clause_text=clause_text)},
+        {
+            "role": "user",
+            "content": USER_TEMPLATE.format(
+                clause_text=clause_text,
+                context_block=_format_references(references or []),
+            ),
+        },
     ]

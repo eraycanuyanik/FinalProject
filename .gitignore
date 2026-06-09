@@ -17,8 +17,9 @@ yarn-error.log*
 .env
 .env.local
 
-# Data (large / generated)
+# Data (large / regenerable via scripts/scrape_mevzuat.py + build_rag.py)
 data/chroma/
+data/corpus/*.pdf
 data/corpus/*.txt
 data/corpus/*.json
 uploads/

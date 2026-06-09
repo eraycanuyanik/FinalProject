@@ -77,6 +77,15 @@ async def llm_ping(req: PingRequest) -> PingResponse:
     return PingResponse(model=llm_client.model, reply=reply)
 
 
+@app.get("/rag/status")
+async def rag_status() -> dict:
+    """RAG koleksiyonunda kaç kanun maddesi indekslendiğini döndürür."""
+    from app.services.rag import collection_count
+
+    count = collection_count()
+    return {"indexed_articles": count, "ready": count > 0}
+
+
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"app": "Anlattım API", "docs": "/docs", "health": "/health"}
