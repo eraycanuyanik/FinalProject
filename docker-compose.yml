@@ -1,0 +1,61 @@
+# Anlattım — local-only Turkish contract analyzer.
+# `docker compose up` brings up: backend (FastAPI), frontend (Next.js), chromadb.
+# The LLM is NOT a container: it is LM Studio running on the host at :1234,
+# reached from containers via host.docker.internal.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: anlattim-backend
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-lm-studio}
+      LLM_MODEL: ${LLM_MODEL:-google/gemma-4-e4b}
+      LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-120}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
+      HF_HOME: /app/hf_cache
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./backend:/app
+      - hf_cache:/app/hf_cache
+      - ./data:/data
+    # Lets the container resolve host.docker.internal on Linux too (Docker Desktop
+    # already provides it on macOS/Windows, but this makes it explicit/portable).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - chromadb
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: anlattim-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: anlattim-chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./data/chroma:/chroma/chroma
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+
+volumes:
+  hf_cache:

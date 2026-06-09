@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-error.log*
+
+# Env
+.env
+.env.local
+
+# Data (large / generated)
+data/chroma/
+data/corpus/*.txt
+data/corpus/*.json
+uploads/
+
+# Model cache (downloaded embeddings)
+.cache/
+hf_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
