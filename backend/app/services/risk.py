@@ -1,15 +1,22 @@
-"""Risk değerlendirme pipeline'ı: segmentasyon + madde başına LLM analizi."""
+"""Risk değerlendirme pipeline'ı: segmentasyon + toplu (batch) LLM analizi.
+
+Hız için maddeler gruplar halinde TEK LLM çağrısında değerlendirilir
+(28 madde → 28 çağrı yerine ~3-4 çağrı).
+"""
 from __future__ import annotations
 
 import json
 
-from app.prompts.risk_assess import RISK_SCHEMA, build_messages
+from app.prompts.risk_assess import BATCH_SCHEMA, build_batch_messages
 from app.services.llm import llm_client
 from app.services.rag import retrieve
-from app.services.segmenter import Clause, segment
+from app.services.segmenter import segment
 
 # Tek bir maddenin LLM'e gönderilen maksimum uzunluğu.
-_MAX_CLAUSE_CHARS = 4000
+_MAX_CLAUSE_CHARS = 2500
+# Bir batch'teki azami madde sayısı ve toplam karakter bütçesi.
+_BATCH_MAX_CLAUSES = 8
+_BATCH_MAX_CHARS = 4000
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -19,48 +26,82 @@ def _safe_int(value, default: int = 0) -> int:
         return default
 
 
-async def _assess_clause(clause: Clause) -> dict:
-    text = clause.text[:_MAX_CLAUSE_CHARS]
-    # RAG: maddeyle ilgili kanun maddelerini getir (varsa).
-    references = retrieve(text, k=3)
+def _make_batches(clauses: list) -> list[list]:
+    """Maddeleri sayı + karakter bütçesine göre gruplara böler."""
+    batches: list[list] = []
+    cur: list = []
+    cur_chars = 0
+    for c in clauses:
+        clen = min(len(c.text), _MAX_CLAUSE_CHARS)
+        if cur and (len(cur) >= _BATCH_MAX_CLAUSES or cur_chars + clen > _BATCH_MAX_CHARS):
+            batches.append(cur)
+            cur, cur_chars = [], 0
+        cur.append(c)
+        cur_chars += clen
+    if cur:
+        batches.append(cur)
+    return batches
+
+
+def _fallback(reason: str) -> dict:
+    return {
+        "ozet": "",
+        "risk_skoru": 0,
+        "risk_turu": "değerlendirilemedi",
+        "aciklama": reason,
+        "taraf": "notr",
+    }
+
+
+async def _assess_batch(clauses: list, refs_by_index: dict[int, list]) -> dict[int, dict]:
+    payload = [
+        {"no": c.index, "text": c.text[:_MAX_CLAUSE_CHARS], "references": refs_by_index.get(c.index, [])}
+        for c in clauses
+    ]
+    out: dict[int, dict] = {}
     try:
         raw = await llm_client.chat(
-            build_messages(text, references), temperature=0.1, json_schema=RISK_SCHEMA
+            build_batch_messages(payload), temperature=0.1, json_schema=BATCH_SCHEMA
         )
         data = json.loads(raw)
-        return {
-            "ozet": str(data.get("ozet", "")).strip(),
-            "risk_skoru": _safe_int(data.get("risk_skoru")),
-            "risk_turu": str(data.get("risk_turu", "standart")).strip() or "standart",
-            "aciklama": str(data.get("aciklama", "")).strip(),
-            "taraf": str(data.get("taraf", "notr")).strip() or "notr",
-            "references": references,
-        }
-    except Exception as exc:  # noqa: BLE001 — bir madde patlarsa pipeline durmasın
-        return {
-            "ozet": "",
-            "risk_skoru": 0,
-            "risk_turu": "değerlendirilemedi",
-            "aciklama": f"Bu madde otomatik değerlendirilemedi: {exc}",
-            "taraf": "notr",
-            "references": references,
-        }
+        for item in data.get("maddeler", []):
+            no = item.get("no")
+            if not isinstance(no, int):
+                continue
+            out[no] = {
+                "ozet": str(item.get("ozet", "")).strip(),
+                "risk_skoru": _safe_int(item.get("risk_skoru")),
+                "risk_turu": str(item.get("risk_turu", "standart")).strip() or "standart",
+                "aciklama": str(item.get("aciklama", "")).strip(),
+                "taraf": str(item.get("taraf", "notr")).strip() or "notr",
+            }
+    except Exception as exc:  # noqa: BLE001 — bir batch patlarsa pipeline durmasın
+        for c in clauses:
+            out[c.index] = _fallback(f"Otomatik değerlendirilemedi: {exc}")
+    return out
 
 
 async def analyze_document(text: str) -> list[dict]:
-    """Belgeyi maddelere böler ve her maddeyi sırayla değerlendirir."""
+    """Belgeyi maddelere böler, RAG referanslarını çeker ve toplu değerlendirir."""
     clauses = segment(text)
+
+    # RAG referanslarını her madde için topla (LLM'e göre ucuz).
+    refs_by_index = {c.index: retrieve(c.text[:_MAX_CLAUSE_CHARS], k=3) for c in clauses}
+
     results: list[dict] = []
-    for clause in clauses:
-        assessment = await _assess_clause(clause)
-        results.append(
-            {
-                "index": clause.index,
-                "label": clause.label,
-                "text": clause.text,
-                "start": clause.start,
-                "end": clause.end,
-                **assessment,
-            }
-        )
+    for batch in _make_batches(clauses):
+        assessments = await _assess_batch(batch, refs_by_index)
+        for c in batch:
+            a = assessments.get(c.index) or _fallback("Model bu maddeyi atladı.")
+            results.append(
+                {
+                    "index": c.index,
+                    "label": c.label,
+                    "text": c.text,
+                    "start": c.start,
+                    "end": c.end,
+                    "references": refs_by_index.get(c.index, []),
+                    **a,
+                }
+            )
     return results

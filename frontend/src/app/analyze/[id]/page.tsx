@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -62,7 +62,12 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
     }
   }, [id]);
 
+  // Aynı belge için analizi YALNIZCA BİR KEZ tetikle (React StrictMode dev'de
+  // effect'i iki kez çalıştırır; bu olmadan analiz iki kez başlardı).
+  const startedRef = useRef<string | null>(null);
   useEffect(() => {
+    if (startedRef.current === id) return;
+    startedRef.current = id;
     getDocument(id)
       .then((d) => {
         setDoc(d);

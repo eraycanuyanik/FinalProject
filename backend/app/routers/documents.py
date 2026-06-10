@@ -1,4 +1,6 @@
 """Belge yükleme, görüntüleme, özetleme uçları (Faz 2)."""
+import asyncio
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models.schemas import (
@@ -18,6 +20,10 @@ from app.services.risk import analyze_document
 from app.services.summarizer import summarize_document
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+# Belge başına analiz kilidi: aynı belge için eşzamanlı /analyze istekleri
+# (ör. çift sekme/yenileme) tek bir hesaplamayı paylaşsın, modeli iki kez yormasın.
+_analyze_locks: dict[str, asyncio.Lock] = {}
 
 # 20 MB üst sınır.
 _MAX_BYTES = 20 * 1024 * 1024
@@ -115,14 +121,26 @@ async def analyze(doc_id: str) -> AnalyzeResponse:
         clauses = [ClauseRisk(**c) for c in doc.analysis]
         return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
 
-    try:
-        analysis = await analyze_document(doc.text)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=502, detail=f"Risk analizi hatası: {exc}"
-        ) from exc
+    # Eşzamanlı istekleri tek hesaplamada birleştir (modeli iki kez yorma).
+    lock = _analyze_locks.setdefault(doc_id, asyncio.Lock())
+    async with lock:
+        doc = document_store.get(doc_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Belge bulunamadı.")
+        # Kilidi beklerken başka bir istek bitirmiş olabilir → cache'i kullan.
+        if doc.analysis is not None:
+            clauses = [ClauseRisk(**c) for c in doc.analysis]
+            return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
 
-    document_store.set_analysis(doc.id, analysis)
+        try:
+            analysis = await analyze_document(doc.text)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=502, detail=f"Risk analizi hatası: {exc}"
+            ) from exc
+
+        document_store.set_analysis(doc.id, analysis)
+
     clauses = [ClauseRisk(**c) for c in analysis]
     return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
 

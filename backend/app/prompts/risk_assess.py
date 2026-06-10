@@ -66,3 +66,56 @@ def build_messages(clause_text: str, references: list[dict] | None = None) -> li
             ),
         },
     ]
+
+
+# --- Toplu (batch) değerlendirme: birden çok maddeyi tek LLM çağrısında değerlendirir ---
+
+BATCH_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "maddeler": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "no": {"type": "integer"},
+                    "ozet": {"type": "string"},
+                    "risk_skoru": {"type": "integer", "minimum": 0, "maximum": 100},
+                    "risk_turu": {"type": "string"},
+                    "aciklama": {"type": "string"},
+                    "taraf": {"type": "string", "enum": ["yukumluluk", "hak", "notr"]},
+                },
+                "required": ["no", "ozet", "risk_skoru", "risk_turu", "aciklama", "taraf"],
+            },
+        }
+    },
+    "required": ["maddeler"],
+}
+
+BATCH_SYSTEM_PROMPT = SYSTEM_PROMPT + """
+
+Sana NUMARALANDIRILMIŞ birden fazla madde verilecek. HER madde için ayrı bir \
+değerlendirme üret ve "no" alanına o maddenin numarasını yaz. Tüm maddeleri \
+"maddeler" dizisinde döndür; hiçbirini atlama.
+
+KISA YAZ: "ozet" en fazla 1 cümle, "aciklama" en fazla 1-2 cümle olsun. \
+Gereksiz tekrar yapma. Bu, hızlı yanıt için önemlidir."""
+
+
+def build_batch_messages(clauses: list[dict]) -> list[dict[str, str]]:
+    """clauses: [{'no': int, 'text': str, 'references': [...]}, ...]"""
+    parts = []
+    for c in clauses:
+        block = f"### Madde {c['no']}\n{c['text']}"
+        refs = c.get("references") or []
+        if refs:
+            ref_lines = "; ".join(
+                f"{r.get('kanun_adi', '')} m.{r.get('madde_no', '')}" for r in refs[:2]
+            )
+            block += f"\n(İlgili mevzuat: {ref_lines})"
+        parts.append(block)
+    user = "Aşağıdaki maddelerin HER BİRİNİ değerlendir:\n\n" + "\n\n".join(parts)
+    return [
+        {"role": "system", "content": BATCH_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]
