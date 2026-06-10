@@ -10,7 +10,7 @@ from app.models.schemas import (
     PingResponse,
     ServiceStatus,
 )
-from app.routers import documents
+from app.routers import chat, documents
 from app.services.llm import llm_client
 
 settings = get_settings()
@@ -30,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(documents.router)
+app.include_router(chat.router)
 
 
 @app.get("/health", response_model=HealthResponse)

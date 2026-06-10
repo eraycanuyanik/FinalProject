@@ -103,7 +103,8 @@ curl http://localhost:8000/rag/status
 - [x] **Faz 4 — RAG:** mevzuat.gov.tr konsolide PDF'leri (TBK/İş/Tüketici) → madde
       bazlı parçalama → e5-large embedding → ChromaDB (876 madde). Risk analizinde
       her maddeye ilgili kanun maddesi referansı eklenir.
-- [ ] **Faz 5 — Chat:** belge bağlamında soru-cevap.
+- [x] **Faz 5 — Chat:** belge bağlamı + RAG + sohbet geçmişiyle soru-cevap;
+      yanıtlar kanun maddesi (ör. "TBK m. 346") referansı içerir.
 - [ ] **Faz 6 — Polish:** hata yönetimi, responsive, demo, doğruluk ölçümü.
 
 ---

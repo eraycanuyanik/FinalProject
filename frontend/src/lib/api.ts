@@ -83,6 +83,30 @@ export async function summarizeDocument(id: string): Promise<string> {
   return data.summary as string;
 }
 
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+export type ChatResponse = {
+  answer: string;
+  references: LawReference[];
+};
+
+export async function sendChat(
+  docId: string,
+  message: string,
+  history: ChatMessage[]
+): Promise<ChatResponse> {
+  const res = await fetch(`${API_URL}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ doc_id: docId, message, history }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function analyzeDocument(id: string): Promise<AnalyzeResponse> {
   const res = await fetch(`${API_URL}/documents/${id}/analyze`, {
     method: "POST",

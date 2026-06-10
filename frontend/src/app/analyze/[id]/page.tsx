@@ -13,6 +13,7 @@ import {
   summarizeDocument,
 } from "@/lib/api";
 import RiskHighlighter, { riskColor } from "@/components/RiskHighlighter";
+import ChatPanel from "@/components/ChatPanel";
 
 const md = {
   h2: (p: any) => <h2 className="mt-5 mb-2 text-lg font-semibold text-emerald-300" {...p} />,
@@ -214,8 +215,13 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      <div className="mt-6">
+        <ChatPanel docId={id} />
+      </div>
+
       <p className="mt-6 text-xs text-slate-600">
-        Risk skorları yapay zeka tahminidir, kesin hukuki değerlendirme değildir.
+        Risk skorları ve sohbet yanıtları yapay zeka tahminidir, kesin hukuki
+        değerlendirme değildir.
       </p>
     </main>
   );
