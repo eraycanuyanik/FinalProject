@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.services.mevzuat_parser import parse_articles  # noqa: E402
 from app.services.rag import embed_passages, get_or_create_collection  # noqa: E402
-from scripts.scrape_mevzuat import KANUNLAR, CORPUS_DIR  # noqa: E402
+from scripts.scrape_mevzuat import CORPUS_DIR, KANUNLAR  # noqa: E402
 
 BATCH = 64
 

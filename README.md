@@ -110,6 +110,21 @@ curl http://localhost:8000/rag/status
 
 ---
 
+## Kalite: Lint & CI
+
+```bash
+# Backend lint (ruff)
+docker compose exec backend ruff check app scripts tests
+
+# Frontend lint (eslint)
+docker compose exec frontend npm run lint
+```
+
+Her `push`/PR'da **GitHub Actions** ([.github/workflows/ci.yml](.github/workflows/ci.yml))
+iki işi koşar:
+- **backend:** ruff lint + pytest
+- **frontend:** eslint + production build (`next build`)
+
 ## Geliştirici Notları
 
 ```bash

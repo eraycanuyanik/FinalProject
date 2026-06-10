@@ -80,7 +80,7 @@ def retrieve(query: str, k: int = 3) -> list[dict]:
     docs = (res.get("documents") or [[]])[0]
     metas = (res.get("metadatas") or [[]])[0]
     dists = (res.get("distances") or [[]])[0]
-    for doc, meta, dist in zip(docs, metas, dists):
+    for doc, meta, dist in zip(docs, metas, dists, strict=False):
         out.append(
             {
                 "kanun_adi": meta.get("kanun_adi", ""),
