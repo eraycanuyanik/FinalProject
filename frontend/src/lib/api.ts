@@ -107,6 +107,41 @@ export async function sendChat(
   return res.json();
 }
 
+export async function streamAnalyze(
+  docId: string,
+  handlers: {
+    onMeta?: (total: number) => void;
+    onClause?: (clause: ClauseRisk) => void;
+    onDone?: () => void;
+  }
+): Promise<void> {
+  const res = await fetch(`${API_URL}/documents/${docId}/analyze/stream`, {
+    method: "POST",
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`Analiz başlatılamadı (HTTP ${res.status})`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const ev = JSON.parse(line);
+      if (ev.type === "meta") handlers.onMeta?.(ev.total);
+      else if (ev.type === "clause") handlers.onClause?.(ev.clause);
+      else if (ev.type === "done") handlers.onDone?.();
+      else if (ev.type === "error") throw new Error(ev.detail || "Analiz hatası");
+    }
+  }
+}
+
 export async function analyzeDocument(id: string): Promise<AnalyzeResponse> {
   const res = await fetch(`${API_URL}/documents/${id}/analyze`, {
     method: "POST",

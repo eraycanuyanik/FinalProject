@@ -15,8 +15,10 @@ from app.services.segmenter import segment
 # Tek bir maddenin LLM'e gönderilen maksimum uzunluğu.
 _MAX_CLAUSE_CHARS = 2500
 # Bir batch'teki azami madde sayısı ve toplam karakter bütçesi.
-_BATCH_MAX_CLAUSES = 8
-_BATCH_MAX_CHARS = 4000
+# Küçük tutuyoruz: akışta (streaming) sonuçlar daha sık görünsün. Üretim süresi
+# zaten baskın olduğundan, fazladan birkaç çağrının maliyeti düşük.
+_BATCH_MAX_CLAUSES = 4
+_BATCH_MAX_CHARS = 2200
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -81,20 +83,25 @@ async def _assess_batch(clauses: list, refs_by_index: dict[int, list]) -> dict[i
     return out
 
 
-async def analyze_document(text: str) -> list[dict]:
-    """Belgeyi maddelere böler, RAG referanslarını çeker ve toplu değerlendirir."""
+async def iter_analysis(text: str):
+    """Maddeleri batch'ler hâlinde değerlendirir; her madde bittikçe 'yield' eder.
+
+    Önce {'type':'meta','total':N} verir, sonra her madde için
+    {'type':'clause','clause':{...}}. Akış (streaming) için kullanılır.
+    """
     clauses = segment(text)
+    yield {"type": "meta", "total": len(clauses)}
 
     # RAG referanslarını her madde için topla (LLM'e göre ucuz).
     refs_by_index = {c.index: retrieve(c.text[:_MAX_CLAUSE_CHARS], k=3) for c in clauses}
 
-    results: list[dict] = []
     for batch in _make_batches(clauses):
         assessments = await _assess_batch(batch, refs_by_index)
         for c in batch:
             a = assessments.get(c.index) or _fallback("Model bu maddeyi atladı.")
-            results.append(
-                {
+            yield {
+                "type": "clause",
+                "clause": {
                     "index": c.index,
                     "label": c.label,
                     "text": c.text,
@@ -102,6 +109,14 @@ async def analyze_document(text: str) -> list[dict]:
                     "end": c.end,
                     "references": refs_by_index.get(c.index, []),
                     **a,
-                }
-            )
+                },
+            }
+
+
+async def analyze_document(text: str) -> list[dict]:
+    """Tüm analizi toplayıp döndürür (akış gerektirmeyen yollar için)."""
+    results: list[dict] = []
+    async for ev in iter_analysis(text):
+        if ev["type"] == "clause":
+            results.append(ev["clause"])
     return results

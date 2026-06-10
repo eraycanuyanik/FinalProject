@@ -1,7 +1,9 @@
 """Belge yükleme, görüntüleme, özetleme uçları (Faz 2)."""
 import asyncio
+import json
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.models.schemas import (
     AnalyzeResponse,
@@ -16,7 +18,7 @@ from app.services.extractor import (
     UnsupportedFileType,
     extract_text,
 )
-from app.services.risk import analyze_document
+from app.services.risk import analyze_document, iter_analysis
 from app.services.summarizer import summarize_document
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -143,6 +145,39 @@ async def analyze(doc_id: str) -> AnalyzeResponse:
 
     clauses = [ClauseRisk(**c) for c in analysis]
     return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
+
+
+@router.post("/{doc_id}/analyze/stream")
+async def analyze_stream(doc_id: str) -> StreamingResponse:
+    """Analizi NDJSON olarak akıtır: maddeler bittikçe satır satır gönderir.
+
+    Toplam süre aynıdır ama istemci ilerlemeyi (ve sonuçları) canlı görür.
+    """
+    doc = document_store.get(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Belge bulunamadı.")
+
+    async def gen():
+        # Önbellekte varsa anında geri oynat.
+        if doc.analysis is not None:
+            yield json.dumps({"type": "meta", "total": len(doc.analysis)}) + "\n"
+            for c in doc.analysis:
+                yield json.dumps({"type": "clause", "clause": c}, ensure_ascii=False) + "\n"
+            yield json.dumps({"type": "done"}) + "\n"
+            return
+
+        collected: list[dict] = []
+        try:
+            async for ev in iter_analysis(doc.text):
+                if ev["type"] == "clause":
+                    collected.append(ev["clause"])
+                yield json.dumps(ev, ensure_ascii=False) + "\n"
+            document_store.set_analysis(doc_id, collected)
+            yield json.dumps({"type": "done"}) + "\n"
+        except Exception as exc:  # noqa: BLE001
+            yield json.dumps({"type": "error", "detail": str(exc)}) + "\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
 
 
 @router.delete("/{doc_id}")

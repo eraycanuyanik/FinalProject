@@ -5,11 +5,10 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
-  AnalyzeResponse,
   ClauseRisk,
   DocumentResponse,
-  analyzeDocument,
   getDocument,
+  streamAnalyze,
   summarizeDocument,
 } from "@/lib/api";
 import RiskHighlighter, { riskColor } from "@/components/RiskHighlighter";
@@ -30,6 +29,7 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
 
   const [clauses, setClauses] = useState<ClauseRisk[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
@@ -40,9 +40,17 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
   const runAnalyze = useCallback(async () => {
     setAnalyzing(true);
     setAnalyzeError(null);
+    setClauses([]);
+    setTotal(0);
+    const acc: ClauseRisk[] = [];
     try {
-      const res: AnalyzeResponse = await analyzeDocument(id);
-      setClauses(res.clauses);
+      await streamAnalyze(id, {
+        onMeta: (t) => setTotal(t),
+        onClause: (c) => {
+          acc.push(c);
+          setClauses([...acc]);
+        },
+      });
     } catch (e) {
       setAnalyzeError(String(e instanceof Error ? e.message : e));
     } finally {
@@ -117,13 +125,25 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
             Belge — riskli maddeler işaretli{" "}
             <span className="font-normal text-slate-500">(üzerine gel → açıklama)</span>
           </header>
+          {analyzing && (
+            <div className="border-b border-slate-700 px-5 py-2">
+              <div className="mb-1 flex items-center justify-between text-xs text-slate-400">
+                <span>
+                  Maddeler analiz ediliyor (lokal yapay zeka)…
+                  {total > 0 && ` ${clauses?.length ?? 0}/${total}`}
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full bg-emerald-500 transition-all"
+                  style={{
+                    width: total ? `${((clauses?.length ?? 0) / total) * 100}%` : "8%",
+                  }}
+                />
+              </div>
+            </div>
+          )}
           <div className="max-h-[78vh] overflow-auto p-3">
-            {analyzing && (
-              <p className="px-3 py-2 text-slate-400">
-                Maddeler analiz ediliyor… Her madde lokal yapay zekayla
-                değerlendiriliyor, bu birkaç dakika sürebilir.
-              </p>
-            )}
             {analyzeError && (
               <p className="m-3 rounded-md bg-rose-500/10 p-3 text-rose-300">
                 {analyzeError}
@@ -132,8 +152,11 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
                 </button>
               </p>
             )}
-            {!analyzing && clauses && doc && (
+            {clauses && clauses.length > 0 && doc && (
               <RiskHighlighter text={doc.text} clauses={clauses} />
+            )}
+            {analyzing && (!clauses || clauses.length === 0) && (
+              <p className="px-3 py-2 text-slate-500">İlk maddeler hazırlanıyor…</p>
             )}
           </div>
         </section>
@@ -150,10 +173,10 @@ export default function AnalyzePage({ params }: { params: { id: string } }) {
               )}
             </header>
             <div className="max-h-[40vh] overflow-auto p-3">
-              {!clauses && !analyzeError && (
+              {(!clauses || clauses.length === 0) && !analyzeError && (
                 <p className="px-2 py-1 text-sm text-slate-500">Hesaplanıyor…</p>
               )}
-              {clauses && risky.length === 0 && (
+              {!analyzing && clauses && clauses.length > 0 && risky.length === 0 && (
                 <p className="px-2 py-1 text-sm text-emerald-300">
                   Belirgin bir riskli madde bulunamadı.
                 </p>
