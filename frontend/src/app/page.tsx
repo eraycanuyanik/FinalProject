@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { uploadDocument } from "@/lib/api";
 import HealthBadge from "@/components/HealthBadge";
 
-const ACCEPT = ".pdf,.docx,.txt";
+const ACCEPT = ".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,.tiff,.bmp";
 
 export default function Home() {
   const router = useRouter();
@@ -76,7 +76,7 @@ export default function Home() {
               Sözleşmeni buraya sürükle ya da tıklayıp seç
             </p>
             <p className="mt-2 text-sm text-slate-500">
-              PDF, DOCX veya TXT · en fazla 20 MB
+              PDF, DOCX, TXT veya fotoğraf (JPG/PNG) · en fazla 20 MB
             </p>
           </>
         )}

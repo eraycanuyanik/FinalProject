@@ -15,7 +15,8 @@ from docx import Document as DocxDocument
 # Bu eşiğin altında metin çıkan PDF'i "taranmış" sayıp OCR deneriz.
 _OCR_MIN_CHARS = 100
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".webp", ".tiff", ".bmp"}
+_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".bmp"}
 
 
 class UnsupportedFileType(Exception):
@@ -82,6 +83,18 @@ def _extract_docx(content: bytes) -> ExtractionResult:
     return ExtractionResult(text=text, method="docx", pages=0, ocr_used=False)
 
 
+def _extract_image(content: bytes) -> ExtractionResult:
+    """Telefonla çekilmiş / taranmış görsel sözleşmeden OCR ile metin çıkarır."""
+    import io as _io
+
+    import pytesseract
+    from PIL import Image
+
+    img = Image.open(_io.BytesIO(content))
+    text = pytesseract.image_to_string(img, lang="tur").strip()
+    return ExtractionResult(text=text, method="image+ocr", pages=1, ocr_used=True)
+
+
 def _extract_txt(content: bytes) -> ExtractionResult:
     for enc in ("utf-8", "utf-8-sig", "iso-8859-9", "cp1254", "latin-1"):
         try:
@@ -103,6 +116,8 @@ def extract_text(filename: str, content: bytes) -> ExtractionResult:
         return _extract_docx(content)
     if ext == ".txt":
         return _extract_txt(content)
+    if ext in _IMAGE_EXTENSIONS:
+        return _extract_image(content)
     raise UnsupportedFileType(
         f"Desteklenmeyen dosya türü: '{ext or filename}'. "
         f"Desteklenenler: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"

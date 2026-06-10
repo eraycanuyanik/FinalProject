@@ -95,8 +95,9 @@ curl http://localhost:8000/rag/status
 ## Geliştirme Yol Haritası (Fazlar)
 
 - [x] **Faz 1 — İskelet:** docker-compose, `/health`, LM Studio bağlantı testi, boş UI.
-- [x] **Faz 2 — Belge işleme:** PDF/DOCX/TXT yükleme (drag-drop), metin çıkarma
-      (OCR fallback ile), tek-prompt özetleme, "ham metin | özet" görüntüleyici.
+- [x] **Faz 2 — Belge işleme:** PDF/DOCX/TXT **ve fotoğraf (JPG/PNG/…)** yükleme
+      (drag-drop), metin çıkarma (taranmış PDF + görseller için tesseract Türkçe OCR),
+      tek-prompt özetleme, "ham metin | özet" görüntüleyici.
 - [x] **Faz 3 — Risk pipeline:** madde segmentasyonu (regex + paragraf fallback),
       madde başına yapısal risk skoru/türü/açıklaması (JSON schema), belgede renk
       kodlu highlight + hover açıklama balonu, riskli maddeler listesi.

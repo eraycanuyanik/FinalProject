@@ -1,0 +1,28 @@
+FREELANCE YAZILIM HİZMET SÖZLEŞMESİ
+
+Madde 1 - Taraflar
+İşveren: Delta Yazılım A.Ş.
+Hizmet Veren: Can Yıldız (serbest yazılımcı)
+
+Madde 2 - İşin Konusu
+Hizmet veren, işverene mobil uygulama geliştirme hizmeti sunacaktır.
+
+Madde 3 - Ücret ve Ödeme
+Toplam ücret 150.000 TL'dir. Ödeme, projenin tamamen teslim edilip işveren
+tarafından onaylanmasından 90 gün sonra yapılır. İşveren tek taraflı olarak
+işi beğenmediğini belirtirse hiçbir ödeme yapılmaz.
+
+Madde 4 - Fikri Mülkiyet
+Hizmet verenin ürettiği tüm kod ve fikri haklar koşulsuz olarak işverene aittir.
+Hizmet veren bu çalışmaları portföyünde dahi gösteremez.
+
+Madde 5 - Rekabet Yasağı
+Hizmet veren, sözleşme bittikten sonra 5 yıl boyunca Türkiye'nin tamamında
+hiçbir yazılım işi yapamaz.
+
+Madde 6 - Cezai Şart
+Hizmet veren işi zamanında teslim etmezse, her gün için toplam ücretin %10'u
+kadar cezai şart öder. Bu ceza ücretten bağımsız olarak tahsil edilir.
+
+Madde 7 - Gizlilik
+Taraflar öğrendikleri ticari sırları üçüncü kişilerle paylaşmayacaktır.

@@ -50,6 +50,6 @@ def test_upload_and_get_and_delete():
 def test_unsupported_type_rejected():
     resp = client.post(
         "/documents/upload",
-        files={"file": ("resim.png", io.BytesIO(b"\x89PNG..."), "image/png")},
+        files={"file": ("tablo.xlsx", io.BytesIO(b"PK\x03\x04..."), "application/vnd.ms-excel")},
     )
     assert resp.status_code == 415
