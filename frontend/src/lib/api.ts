@@ -51,9 +51,15 @@ export type AnalyzeResponse = {
   clauses: ClauseRisk[];
 };
 
-export async function uploadDocument(file: File): Promise<UploadResponse> {
+export type Jurisdiction = "tr" | "us";
+
+export async function uploadDocument(
+  file: File,
+  jurisdiction: Jurisdiction = "tr"
+): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
+  form.append("jurisdiction", jurisdiction);
   const res = await fetch(`${API_URL}/documents/upload`, {
     method: "POST",
     body: form,
@@ -90,15 +96,21 @@ export type ChatResponse = {
   references: LawReference[];
 };
 
-export async function sendChat(
-  docId: string,
-  message: string,
-  history: ChatMessage[]
-): Promise<ChatResponse> {
+export async function sendChat(params: {
+  message: string;
+  history: ChatMessage[];
+  docId?: string;
+  jurisdiction?: Jurisdiction;
+}): Promise<ChatResponse> {
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ doc_id: docId, message, history }),
+    body: JSON.stringify({
+      message: params.message,
+      history: params.history,
+      doc_id: params.docId,
+      jurisdiction: params.jurisdiction ?? "tr",
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));

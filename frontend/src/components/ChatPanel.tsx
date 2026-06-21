@@ -32,7 +32,7 @@ export default function ChatPanel({ docId }: { docId: string }) {
     setTurns((prev) => [...prev, { role: "user", content: q }]);
     setBusy(true);
     try {
-      const res = await sendChat(docId, q, history);
+      const res = await sendChat({ message: q, history, docId });
       setTurns((prev) => [
         ...prev,
         { role: "assistant", content: res.answer, references: res.references },

@@ -10,6 +10,11 @@ referansla uyarır.
 > 🔒 **Gizlilik birinci kural:** Hiçbir belge dış bir API'ye gönderilmez. Tüm yapay
 > zeka çıkarımı bilgisayarınızda, lokal olarak çalışır.
 
+> 🌍 **Çok ülkeli:** Üstteki **TR / US** geçişiyle Türk hukuku (Türkçe) veya ABD
+> hukuku (İngilizce) arasında geçiş yapılır. Uygulama **sohbet ekranıyla** açılır —
+> belge yüklemeden genel hukuki soru sorabilir ya da bir sözleşme yükleyip madde
+> bazlı risk analizi alabilirsiniz.
+
 ---
 
 ## Mimari
@@ -74,19 +79,23 @@ docker compose up --build
 Ana sayfadaki **Servis Durumu** panelinde LM Studio ve ChromaDB yeşil yanıyorsa
 her şey hazır. **"Modele Merhaba de"** butonu ile LLM bağlantısını test edebilirsiniz.
 
-### RAG korpusunu oluşturma (Türk hukuku referansları — bir kerelik)
-Risk analizinin ilgili kanun maddelerine atıf yapabilmesi için mevzuat korpusunu
-indekslemek gerekir. Servisler ayaktayken:
+### RAG korpusunu oluşturma (bir kerelik)
+Risk analizi ve sohbetin ilgili kanun maddelerine atıf yapabilmesi için korpusları
+indeksleyin. Servisler ayaktayken:
 ```bash
-# 1) Kanun PDF'lerini mevzuat.gov.tr'den indir (TBK, İş K., Tüketici K.)
+# --- Türkiye (TBK, İş K., Tüketici K.) ---
 docker compose exec backend python scripts/scrape_mevzuat.py
+docker compose exec backend python scripts/build_rag.py tr
 
-# 2) Maddelere böl, embed et, ChromaDB'ye yükle (embedding modeli ilk seferde ~2GB iner)
-docker compose exec backend python scripts/build_rag.py
+# --- ABD (16/29 CFR + UCC Madde 2 + California Civil Code) ---
+docker compose exec backend python scripts/scrape_us_law.py
+docker compose exec backend python scripts/build_rag.py us
 
-# 3) Kaç madde indekslendiğini kontrol et
+# Kaç madde indekslendi? (her iki ülke)
 curl http://localhost:8000/rag/status
 ```
+> Embedding modeli (`multilingual-e5-large`, hem TR hem EN) ilk çalıştırmada ~2GB
+> iner ve cache'lenir. İndeksleme bittikten sonra uygulama tamamen offline çalışır.
 > Bu adım internet gerektirir (sadece korpus indirme + embedding modeli). İndeksleme
 > bittikten sonra uygulama tamamen offline çalışır; korpus `data/chroma`'da kalıcıdır.
 
