@@ -1,7 +1,11 @@
-"""Türk hukuku RAG: ChromaDB'den ilgili kanun maddelerini getirir.
+"""Çok-ülkeli hukuk RAG: ülkeye (jurisdiction) göre ayrı ChromaDB koleksiyonu.
 
-Embedding modeli (intfloat/multilingual-e5-large) lokal çalışır ve hf_cache
-volume'una indirilir. e5 modeli "query: " / "passage: " önekleri ister.
+- tr → "turk_hukuku"  (Türk mevzuatı)
+- us → "us_law"       (ABD federal + eyalet hukuku)
+
+Embedding modeli (intfloat/multilingual-e5-large) hem Türkçe hem İngilizce için
+kullanılır; lokal çalışır, hf_cache volume'una indirilir. e5 "query:"/"passage:"
+öneklerini ister (dilden bağımsız).
 """
 from __future__ import annotations
 
@@ -9,12 +13,18 @@ import threading
 
 from app.config import get_settings
 
-COLLECTION_NAME = "turk_hukuku"
+COLLECTIONS = {"tr": "turk_hukuku", "us": "us_law"}
+DEFAULT_JURISDICTION = "tr"
 
 _embedder = None
 _embedder_lock = threading.Lock()
-_chroma_collection = None
+_collections: dict[str, object] = {}
 _chroma_lock = threading.Lock()
+
+
+def normalize_jurisdiction(j: str | None) -> str:
+    j = (j or "").lower().strip()
+    return j if j in COLLECTIONS else DEFAULT_JURISDICTION
 
 
 def get_embedder():
@@ -43,37 +53,39 @@ def embed_query(text: str) -> list[float]:
     )[0].tolist()
 
 
-def _get_collection(create: bool = False):
-    global _chroma_collection
-    if _chroma_collection is None:
-        with _chroma_lock:
-            if _chroma_collection is None:
-                import chromadb
+def _client():
+    import chromadb
 
-                settings = get_settings()
-                client = chromadb.HttpClient(
-                    host=settings.chroma_host, port=settings.chroma_port
-                )
+    settings = get_settings()
+    return chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
+
+
+def _get_collection(jurisdiction: str, create: bool = False):
+    name = COLLECTIONS[normalize_jurisdiction(jurisdiction)]
+    if name not in _collections:
+        with _chroma_lock:
+            if name not in _collections:
+                client = _client()
                 if create:
-                    _chroma_collection = client.get_or_create_collection(
-                        COLLECTION_NAME, metadata={"hnsw:space": "cosine"}
+                    _collections[name] = client.get_or_create_collection(
+                        name, metadata={"hnsw:space": "cosine"}
                     )
                 else:
-                    _chroma_collection = client.get_collection(COLLECTION_NAME)
-    return _chroma_collection
+                    _collections[name] = client.get_collection(name)
+    return _collections[name]
 
 
-def get_or_create_collection():
-    return _get_collection(create=True)
+def get_or_create_collection(jurisdiction: str):
+    return _get_collection(jurisdiction, create=True)
 
 
-def retrieve(query: str, k: int = 3) -> list[dict]:
-    """Sorguya en yakın k kanun maddesini döndürür. Hata olursa boş liste."""
+def retrieve(query: str, jurisdiction: str = DEFAULT_JURISDICTION, k: int = 3) -> list[dict]:
+    """Sorguya en yakın k kanun maddesini döndürür. Koleksiyon yoksa boş liste."""
     try:
-        collection = _get_collection(create=False)
+        collection = _get_collection(jurisdiction, create=False)
         emb = embed_query(query)
         res = collection.query(query_embeddings=[emb], n_results=k)
-    except Exception:  # noqa: BLE001 — RAG yoksa risk analizi yine de çalışsın
+    except Exception:  # noqa: BLE001 — RAG yoksa analiz yine de çalışsın
         return []
 
     out: list[dict] = []
@@ -93,8 +105,8 @@ def retrieve(query: str, k: int = 3) -> list[dict]:
     return out
 
 
-def collection_count() -> int:
+def collection_count(jurisdiction: str = DEFAULT_JURISDICTION) -> int:
     try:
-        return _get_collection(create=False).count()
+        return _get_collection(jurisdiction, create=False).count()
     except Exception:  # noqa: BLE001
         return 0

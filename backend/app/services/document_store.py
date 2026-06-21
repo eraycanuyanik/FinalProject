@@ -19,6 +19,7 @@ class StoredDocument:
     pages: int
     ocr_used: bool
     char_count: int
+    jurisdiction: str = field(default="tr")
     summary: str | None = field(default=None)
     analysis: list[dict] | None = field(default=None)
 
@@ -29,7 +30,8 @@ class DocumentStore:
         self._lock = threading.Lock()
 
     def add(
-        self, filename: str, text: str, method: str, pages: int, ocr_used: bool
+        self, filename: str, text: str, method: str, pages: int, ocr_used: bool,
+        jurisdiction: str = "tr",
     ) -> StoredDocument:
         doc_id = uuid.uuid4().hex[:12]
         doc = StoredDocument(
@@ -40,6 +42,7 @@ class DocumentStore:
             pages=pages,
             ocr_used=ocr_used,
             char_count=len(text),
+            jurisdiction=jurisdiction,
         )
         with self._lock:
             self._docs[doc_id] = doc

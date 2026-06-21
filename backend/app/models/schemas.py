@@ -29,6 +29,7 @@ class UploadResponse(BaseModel):
     pages: int
     ocr_used: bool
     char_count: int
+    jurisdiction: str = "tr"
     text_preview: str
 
 
@@ -39,6 +40,7 @@ class DocumentResponse(BaseModel):
     pages: int
     ocr_used: bool
     char_count: int
+    jurisdiction: str = "tr"
     text: str
     summary: str | None = None
     analyzed: bool = False
@@ -83,8 +85,9 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    doc_id: str
     message: str
+    doc_id: str | None = None
+    jurisdiction: str = "tr"
     history: list[ChatMessage] = []
 
 

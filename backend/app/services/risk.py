@@ -55,7 +55,9 @@ def _fallback(reason: str) -> dict:
     }
 
 
-async def _assess_batch(clauses: list, refs_by_index: dict[int, list]) -> dict[int, dict]:
+async def _assess_batch(
+    clauses: list, refs_by_index: dict[int, list], jurisdiction: str = "tr"
+) -> dict[int, dict]:
     payload = [
         {"no": c.index, "text": c.text[:_MAX_CLAUSE_CHARS], "references": refs_by_index.get(c.index, [])}
         for c in clauses
@@ -63,7 +65,9 @@ async def _assess_batch(clauses: list, refs_by_index: dict[int, list]) -> dict[i
     out: dict[int, dict] = {}
     try:
         raw = await llm_client.chat(
-            build_batch_messages(payload), temperature=0.1, json_schema=BATCH_SCHEMA
+            build_batch_messages(payload, jurisdiction),
+            temperature=0.1,
+            json_schema=BATCH_SCHEMA,
         )
         data = json.loads(raw)
         for item in data.get("maddeler", []):
@@ -83,7 +87,7 @@ async def _assess_batch(clauses: list, refs_by_index: dict[int, list]) -> dict[i
     return out
 
 
-async def iter_analysis(text: str):
+async def iter_analysis(text: str, jurisdiction: str = "tr"):
     """Maddeleri batch'ler hâlinde değerlendirir; her madde bittikçe 'yield' eder.
 
     Önce {'type':'meta','total':N} verir, sonra her madde için
@@ -93,10 +97,13 @@ async def iter_analysis(text: str):
     yield {"type": "meta", "total": len(clauses)}
 
     # RAG referanslarını her madde için topla (LLM'e göre ucuz).
-    refs_by_index = {c.index: retrieve(c.text[:_MAX_CLAUSE_CHARS], k=3) for c in clauses}
+    refs_by_index = {
+        c.index: retrieve(c.text[:_MAX_CLAUSE_CHARS], jurisdiction=jurisdiction, k=3)
+        for c in clauses
+    }
 
     for batch in _make_batches(clauses):
-        assessments = await _assess_batch(batch, refs_by_index)
+        assessments = await _assess_batch(batch, refs_by_index, jurisdiction)
         for c in batch:
             a = assessments.get(c.index) or _fallback("Model bu maddeyi atladı.")
             yield {
@@ -113,10 +120,10 @@ async def iter_analysis(text: str):
             }
 
 
-async def analyze_document(text: str) -> list[dict]:
+async def analyze_document(text: str, jurisdiction: str = "tr") -> list[dict]:
     """Tüm analizi toplayıp döndürür (akış gerektirmeyen yollar için)."""
     results: list[dict] = []
-    async for ev in iter_analysis(text):
+    async for ev in iter_analysis(text, jurisdiction):
         if ev["type"] == "clause":
             results.append(ev["clause"])
     return results

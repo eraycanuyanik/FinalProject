@@ -7,12 +7,12 @@ from app.services.llm import llm_client
 _MAX_CHARS = 24000
 
 
-async def summarize_document(text: str) -> str:
+async def summarize_document(text: str, jurisdiction: str = "tr") -> str:
     snippet = text.strip()
     if len(snippet) > _MAX_CHARS:
         snippet = (
             snippet[:_MAX_CHARS]
             + "\n\n[... belge çok uzun olduğu için kısaltıldı ...]"
         )
-    messages = build_summarize_messages(snippet)
+    messages = build_summarize_messages(snippet, jurisdiction)
     return await llm_client.chat(messages, temperature=0.2)

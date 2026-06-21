@@ -2,7 +2,7 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.models.schemas import (
@@ -18,6 +18,7 @@ from app.services.extractor import (
     UnsupportedFileType,
     extract_text,
 )
+from app.services.rag import normalize_jurisdiction
 from app.services.risk import analyze_document, iter_analysis
 from app.services.summarizer import summarize_document
 
@@ -32,7 +33,11 @@ _MAX_BYTES = 20 * 1024 * 1024
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
+async def upload_document(
+    file: UploadFile = File(...),
+    jurisdiction: str = Form("tr"),
+) -> UploadResponse:
+    jurisdiction = normalize_jurisdiction(jurisdiction)
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Boş dosya.")
@@ -60,6 +65,7 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
         method=result.method,
         pages=result.pages,
         ocr_used=result.ocr_used,
+        jurisdiction=jurisdiction,
     )
 
     return UploadResponse(
@@ -69,6 +75,7 @@ async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
         pages=doc.pages,
         ocr_used=doc.ocr_used,
         char_count=doc.char_count,
+        jurisdiction=doc.jurisdiction,
         text_preview=doc.text[:500],
     )
 
@@ -85,6 +92,7 @@ async def get_document(doc_id: str) -> DocumentResponse:
         pages=doc.pages,
         ocr_used=doc.ocr_used,
         char_count=doc.char_count,
+        jurisdiction=doc.jurisdiction,
         text=doc.text,
         summary=doc.summary,
         analyzed=doc.analysis is not None,
@@ -102,7 +110,7 @@ async def summarize(doc_id: str) -> SummaryResponse:
         return SummaryResponse(id=doc.id, summary=doc.summary)
 
     try:
-        summary = await summarize_document(doc.text)
+        summary = await summarize_document(doc.text, doc.jurisdiction)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=502, detail=f"LLM özetleme hatası: {exc}"
@@ -135,7 +143,7 @@ async def analyze(doc_id: str) -> AnalyzeResponse:
             return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
 
         try:
-            analysis = await analyze_document(doc.text)
+            analysis = await analyze_document(doc.text, doc.jurisdiction)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=502, detail=f"Risk analizi hatası: {exc}"
@@ -168,7 +176,7 @@ async def analyze_stream(doc_id: str) -> StreamingResponse:
 
         collected: list[dict] = []
         try:
-            async for ev in iter_analysis(doc.text):
+            async for ev in iter_analysis(doc.text, doc.jurisdiction):
                 if ev["type"] == "clause":
                     collected.append(ev["clause"])
                 yield json.dumps(ev, ensure_ascii=False) + "\n"

@@ -92,7 +92,7 @@ BATCH_SCHEMA = {
     "required": ["maddeler"],
 }
 
-BATCH_SYSTEM_PROMPT = SYSTEM_PROMPT + """
+BATCH_SYSTEM_PROMPT_TR = SYSTEM_PROMPT + """
 
 Sana NUMARALANDIRILMIŞ birden fazla madde verilecek. HER madde için ayrı bir \
 değerlendirme üret ve "no" alanına o maddenin numarasını yaz. Tüm maddeleri \
@@ -101,21 +101,53 @@ değerlendirme üret ve "no" alanına o maddenin numarasını yaz. Tüm maddeler
 KISA YAZ: "ozet" en fazla 1 cümle, "aciklama" en fazla 1-2 cümle olsun. \
 Gereksiz tekrar yapma. Bu, hızlı yanıt için önemlidir."""
 
+SYSTEM_PROMPT_EN = """You are "Anlattım", a legal risk-analysis assistant. You \
+evaluate a single clause of a contract from the perspective of the ORDINARY/WEAKER \
+party who will sign it (tenant, employee, consumer, service recipient).
 
-def build_batch_messages(clauses: list[dict]) -> list[dict[str, str]]:
+Your job is to measure whether the clause is AGAINST this person's interests:
+- risk_skoru: 0-100. 0-20 = harmless/standard, 21-50 = pay attention, 51-75 = risky,
+  76-100 = seriously unfair/against them.
+- risk_turu: a short English label (e.g. "one-sided penalty", "no right to cancel",
+  "unfair venue", "excessive late fee", "broad waiver", "standard").
+- ozet: what the clause says, in 1 plain-English sentence.
+- aciklama: why it is risky (or harmless), in plain English.
+- taraf: does the clause mainly impose an obligation ("yukumluluk"), grant a right
+  ("hak"), or is it neutral ("notr")?
+
+Rules: Respond only in English. Do not exaggerate or invent. Return only valid JSON."""
+
+BATCH_SYSTEM_PROMPT_EN = SYSTEM_PROMPT_EN + """
+
+You will be given several NUMBERED clauses. Produce a separate evaluation for EACH \
+clause and put its number in the "no" field. Return all clauses in the "maddeler" \
+array; do not skip any.
+
+BE BRIEF: "ozet" at most 1 sentence, "aciklama" at most 1-2 sentences. Do not repeat \
+yourself. This matters for fast responses."""
+
+
+def build_batch_messages(clauses: list[dict], jurisdiction: str = "tr") -> list[dict[str, str]]:
     """clauses: [{'no': int, 'text': str, 'references': [...]}, ...]"""
+    is_us = jurisdiction == "us"
     parts = []
     for c in clauses:
-        block = f"### Madde {c['no']}\n{c['text']}"
+        label = "Clause" if is_us else "Madde"
+        block = f"### {label} {c['no']}\n{c['text']}"
         refs = c.get("references") or []
         if refs:
             ref_lines = "; ".join(
-                f"{r.get('kanun_adi', '')} m.{r.get('madde_no', '')}" for r in refs[:2]
+                f"{r.get('kanun_adi', '')} {r.get('madde_no', '')}" for r in refs[:2]
             )
-            block += f"\n(İlgili mevzuat: {ref_lines})"
+            block += f"\n({'Relevant law' if is_us else 'İlgili mevzuat'}: {ref_lines})"
         parts.append(block)
-    user = "Aşağıdaki maddelerin HER BİRİNİ değerlendir:\n\n" + "\n\n".join(parts)
+    if is_us:
+        system = BATCH_SYSTEM_PROMPT_EN
+        user = "Evaluate EACH of the following clauses:\n\n" + "\n\n".join(parts)
+    else:
+        system = BATCH_SYSTEM_PROMPT_TR
+        user = "Aşağıdaki maddelerin HER BİRİNİ değerlendir:\n\n" + "\n\n".join(parts)
     return [
-        {"role": "system", "content": BATCH_SYSTEM_PROMPT},
+        {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]
