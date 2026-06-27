@@ -26,6 +26,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
             raise HTTPException(status_code=404, detail="Belge bulunamadı.")
         document_text = doc.text
         jurisdiction = normalize_jurisdiction(doc.jurisdiction)
+        user = doc.user or user
 
     # Soruyla ilgili kanun maddelerini getir (RAG).
     references = retrieve(req.message, jurisdiction=jurisdiction, k=4)

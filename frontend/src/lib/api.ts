@@ -18,6 +18,7 @@ export type DocumentResponse = {
   pages: number;
   ocr_used: boolean;
   char_count: number;
+  jurisdiction: string;
   text: string;
   summary: string | null;
   analyzed: boolean;
@@ -55,11 +56,13 @@ export type Jurisdiction = "tr" | "us";
 
 export async function uploadDocument(
   file: File,
-  jurisdiction: Jurisdiction = "tr"
+  jurisdiction: Jurisdiction = "tr",
+  user = "misafir"
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
   form.append("jurisdiction", jurisdiction);
+  form.append("user", user || "misafir");
   const res = await fetch(`${API_URL}/documents/upload`, {
     method: "POST",
     body: form,
@@ -101,6 +104,7 @@ export async function sendChat(params: {
   history: ChatMessage[];
   docId?: string;
   jurisdiction?: Jurisdiction;
+  user?: string;
 }): Promise<ChatResponse> {
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
@@ -110,6 +114,7 @@ export async function sendChat(params: {
       history: params.history,
       doc_id: params.docId,
       jurisdiction: params.jurisdiction ?? "tr",
+      user: params.user || "misafir",
     }),
   });
   if (!res.ok) {

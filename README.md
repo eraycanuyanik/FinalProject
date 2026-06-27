@@ -119,6 +119,22 @@ curl http://localhost:8000/rag/status
 
 ---
 
+## Maliyet & kullanım panosu (LiteLLM)
+
+Tüm LLM çağrıları **LiteLLM proxy** üzerinden geçer; her istek için token sayılır ve
+**sanal GPT-4o tarifesiyle** ("ChatGPT olsaydı kaç dolar?") maliyet hesaplanır.
+Model aslında lokal LM Studio'dur (gerçek maliyet $0).
+
+- **Dashboard:** http://localhost:4000/ui (kullanıcı `admin`, şifre `anlattim` —
+  `.env`'den değiştirilebilir). Kim ne kadar token/$ harcamış buradan görülür.
+- İlk açılışta uygulama bir **kullanıcı adı** sorar; her istek bu adla (LiteLLM'de
+  `end_user`) etiketlenir.
+
+```bash
+# Komut satırından kişi bazlı harcama:
+curl -s http://localhost:4000/spend/logs -H "Authorization: Bearer sk-anlattim-master"
+```
+
 ## Kalite: Lint & CI
 
 ```bash

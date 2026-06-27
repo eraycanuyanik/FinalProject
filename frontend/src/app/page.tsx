@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
+  API_URL,
   ChatMessage,
   Jurisdiction,
   LawReference,
@@ -12,8 +12,10 @@ import {
   uploadDocument,
 } from "@/lib/api";
 import { JURISDICTIONS, useJurisdiction } from "@/lib/jurisdiction";
+import { useUser } from "@/lib/user";
 import CountrySwitch from "@/components/CountrySwitch";
 import HealthBadge from "@/components/HealthBadge";
+import DocumentAnalysis from "@/components/DocumentAnalysis";
 
 const COPY: Record<
   Jurisdiction,
@@ -48,14 +50,17 @@ const COPY: Record<
 type Turn = ChatMessage & { references?: LawReference[] };
 
 export default function Home() {
-  const router = useRouter();
   const [jurisdiction, setJurisdiction] = useJurisdiction();
+  const [user, setUser, userReady] = useUser();
+  const [nameInput, setNameInput] = useState("");
+
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +75,7 @@ export default function Home() {
     setTurns((p) => [...p, { role: "user", content: q }]);
     setBusy(true);
     try {
-      const res = await sendChat({ message: q, history, jurisdiction });
+      const res = await sendChat({ message: q, history, jurisdiction, user });
       setTurns((p) => [
         ...p,
         { role: "assistant", content: res.answer, references: res.references },
@@ -87,12 +92,51 @@ export default function Home() {
     setError(null);
     setUploading(true);
     try {
-      const res = await uploadDocument(file, jurisdiction);
-      router.push(`/analyze/${res.id}`);
+      const res = await uploadDocument(file, jurisdiction, user);
+      setActiveDocId(res.id);
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
+    } finally {
       setUploading(false);
     }
+  }
+
+  // --- Kullanıcı adı kapısı ---
+  if (userReady && !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900/60 p-6 text-center">
+          <div className="mb-3 text-3xl">⚖️</div>
+          <h1 className="text-xl font-bold">Anlattım’a hoş geldin</h1>
+          <p className="mt-2 text-sm text-slate-400">
+            Seni nasıl çağıralım? (Kullanım/maliyet panosunda bu adla görünürsün.)
+          </p>
+          <input
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && nameInput.trim() && setUser(nameInput)}
+            placeholder="Adın"
+            className="mt-4 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-emerald-500"
+          />
+          <button
+            onClick={() => nameInput.trim() && setUser(nameInput)}
+            disabled={!nameInput.trim()}
+            className="mt-3 w-full rounded-lg bg-emerald-600 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+          >
+            Başla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Belge analiz görünümü (aynı ekranda, sayfa değişmeden) ---
+  if (activeDocId) {
+    return (
+      <main className="mx-auto max-w-7xl px-4 py-6">
+        <DocumentAnalysis docId={activeDocId} onBack={() => setActiveDocId(null)} />
+      </main>
+    );
   }
 
   const started = turns.length > 0;
@@ -122,18 +166,16 @@ export default function Home() {
         </button>
         <div className="flex items-center gap-3">
           <CountrySwitch value={jurisdiction} onChange={setJurisdiction} />
-          {started && (
-            <button
-              onClick={() => setTurns([])}
-              className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
-            >
-              + Yeni
-            </button>
-          )}
+          <button
+            onClick={() => setUser("")}
+            className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-sm text-slate-300 hover:bg-slate-800"
+            title="Kullanıcıyı değiştir"
+          >
+            {user}
+          </button>
         </div>
       </header>
 
-      {/* Sohbet alanı */}
       <div ref={scrollRef} className="flex-1 overflow-auto py-4">
         {!started ? (
           <div className="flex h-full flex-col items-center justify-center py-16 text-center">
@@ -192,12 +234,9 @@ export default function Home() {
         )}
       </div>
 
-      {error && (
-        <p className="mb-2 rounded-md bg-rose-500/10 p-2 text-sm text-rose-300">{error}</p>
-      )}
+      {error && <p className="mb-2 rounded-md bg-rose-500/10 p-2 text-sm text-rose-300">{error}</p>}
 
-      {/* Giriş kutusu */}
-      <div className="sticky bottom-0 bg-transparent pb-4">
+      <div className="sticky bottom-0 pb-4">
         <div
           className={`flex items-center gap-2 rounded-2xl border bg-slate-900/80 px-3 py-2 backdrop-blur ${
             dragging ? "border-emerald-400" : "border-slate-700"
@@ -224,9 +263,7 @@ export default function Home() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") ask(input);
-            }}
+            onKeyDown={(e) => e.key === "Enter" && ask(input)}
             placeholder={copy.placeholder}
             disabled={busy}
             className="flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-500"
@@ -240,13 +277,21 @@ export default function Home() {
             ↑
           </button>
         </div>
-        <div className="mt-2 flex items-center justify-center gap-3 text-center text-xs text-slate-600">
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-center text-xs text-slate-600">
           <HealthBadge />
           <span>·</span>
           <span>
-            {JURISDICTIONS[jurisdiction].label} · {JURISDICTIONS[jurisdiction].lang} · yanıtlar
-            bilgilendirme amaçlıdır
+            {JURISDICTIONS[jurisdiction].label} · {JURISDICTIONS[jurisdiction].lang}
           </span>
+          <span>·</span>
+          <a
+            href={`${API_URL.replace(":8000", ":4000")}/ui`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-slate-500 underline hover:text-slate-300"
+          >
+            Maliyet panosu
+          </a>
         </div>
       </div>
     </main>
