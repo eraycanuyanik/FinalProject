@@ -17,6 +17,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
     document_text: str | None = None
     jurisdiction = normalize_jurisdiction(req.jurisdiction)
+    user = (req.user or "misafir").strip()[:60] or "misafir"
 
     # Belge bağlamı varsa onu ve belgenin ülkesini kullan.
     if req.doc_id:
@@ -38,7 +39,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     )
 
     try:
-        answer = await llm_client.chat(messages, temperature=0.3)
+        answer = await llm_client.chat(messages, temperature=0.3, user=user)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"LLM sohbet hatası: {exc}") from exc
 

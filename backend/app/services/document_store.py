@@ -20,6 +20,7 @@ class StoredDocument:
     ocr_used: bool
     char_count: int
     jurisdiction: str = field(default="tr")
+    user: str = field(default="misafir")
     summary: str | None = field(default=None)
     analysis: list[dict] | None = field(default=None)
 
@@ -31,7 +32,7 @@ class DocumentStore:
 
     def add(
         self, filename: str, text: str, method: str, pages: int, ocr_used: bool,
-        jurisdiction: str = "tr",
+        jurisdiction: str = "tr", user: str = "misafir",
     ) -> StoredDocument:
         doc_id = uuid.uuid4().hex[:12]
         doc = StoredDocument(
@@ -43,6 +44,7 @@ class DocumentStore:
             ocr_used=ocr_used,
             char_count=len(text),
             jurisdiction=jurisdiction,
+            user=user,
         )
         with self._lock:
             self._docs[doc_id] = doc

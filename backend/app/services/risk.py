@@ -56,7 +56,8 @@ def _fallback(reason: str) -> dict:
 
 
 async def _assess_batch(
-    clauses: list, refs_by_index: dict[int, list], jurisdiction: str = "tr"
+    clauses: list, refs_by_index: dict[int, list], jurisdiction: str = "tr",
+    user: str | None = None,
 ) -> dict[int, dict]:
     payload = [
         {"no": c.index, "text": c.text[:_MAX_CLAUSE_CHARS], "references": refs_by_index.get(c.index, [])}
@@ -68,6 +69,7 @@ async def _assess_batch(
             build_batch_messages(payload, jurisdiction),
             temperature=0.1,
             json_schema=BATCH_SCHEMA,
+            user=user,
         )
         data = json.loads(raw)
         for item in data.get("maddeler", []):
@@ -87,7 +89,7 @@ async def _assess_batch(
     return out
 
 
-async def iter_analysis(text: str, jurisdiction: str = "tr"):
+async def iter_analysis(text: str, jurisdiction: str = "tr", user: str | None = None):
     """Maddeleri batch'ler hâlinde değerlendirir; her madde bittikçe 'yield' eder.
 
     Önce {'type':'meta','total':N} verir, sonra her madde için
@@ -103,7 +105,7 @@ async def iter_analysis(text: str, jurisdiction: str = "tr"):
     }
 
     for batch in _make_batches(clauses):
-        assessments = await _assess_batch(batch, refs_by_index, jurisdiction)
+        assessments = await _assess_batch(batch, refs_by_index, jurisdiction, user)
         for c in batch:
             a = assessments.get(c.index) or _fallback("Model bu maddeyi atladı.")
             yield {
@@ -120,10 +122,12 @@ async def iter_analysis(text: str, jurisdiction: str = "tr"):
             }
 
 
-async def analyze_document(text: str, jurisdiction: str = "tr") -> list[dict]:
+async def analyze_document(
+    text: str, jurisdiction: str = "tr", user: str | None = None
+) -> list[dict]:
     """Tüm analizi toplayıp döndürür (akış gerektirmeyen yollar için)."""
     results: list[dict] = []
-    async for ev in iter_analysis(text, jurisdiction):
+    async for ev in iter_analysis(text, jurisdiction, user):
         if ev["type"] == "clause":
             results.append(ev["clause"])
     return results

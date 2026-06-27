@@ -33,6 +33,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         temperature: float = 0.2,
         json_schema: dict | None = None,
+        user: str | None = None,
     ) -> str:
         """Sohbet tamamlama.
 
@@ -44,6 +45,9 @@ class LLMClient:
             "messages": messages,
             "temperature": temperature,
         }
+        if user:
+            # LiteLLM bunu "end_user" olarak kaydeder → kişi bazlı token/maliyet.
+            payload["user"] = user
         if json_schema is not None:
             payload["response_format"] = {
                 "type": "json_schema",

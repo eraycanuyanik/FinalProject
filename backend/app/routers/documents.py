@@ -36,8 +36,10 @@ _MAX_BYTES = 20 * 1024 * 1024
 async def upload_document(
     file: UploadFile = File(...),
     jurisdiction: str = Form("tr"),
+    user: str = Form("misafir"),
 ) -> UploadResponse:
     jurisdiction = normalize_jurisdiction(jurisdiction)
+    user = (user or "misafir").strip()[:60] or "misafir"
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Boş dosya.")
@@ -66,6 +68,7 @@ async def upload_document(
         pages=result.pages,
         ocr_used=result.ocr_used,
         jurisdiction=jurisdiction,
+        user=user,
     )
 
     return UploadResponse(
@@ -110,7 +113,7 @@ async def summarize(doc_id: str) -> SummaryResponse:
         return SummaryResponse(id=doc.id, summary=doc.summary)
 
     try:
-        summary = await summarize_document(doc.text, doc.jurisdiction)
+        summary = await summarize_document(doc.text, doc.jurisdiction, doc.user)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=502, detail=f"LLM özetleme hatası: {exc}"
@@ -143,7 +146,7 @@ async def analyze(doc_id: str) -> AnalyzeResponse:
             return AnalyzeResponse(id=doc.id, clause_count=len(clauses), clauses=clauses)
 
         try:
-            analysis = await analyze_document(doc.text, doc.jurisdiction)
+            analysis = await analyze_document(doc.text, doc.jurisdiction, doc.user)
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(
                 status_code=502, detail=f"Risk analizi hatası: {exc}"
@@ -176,7 +179,7 @@ async def analyze_stream(doc_id: str) -> StreamingResponse:
 
         collected: list[dict] = []
         try:
-            async for ev in iter_analysis(doc.text, doc.jurisdiction):
+            async for ev in iter_analysis(doc.text, doc.jurisdiction, doc.user):
                 if ev["type"] == "clause":
                     collected.append(ev["clause"])
                 yield json.dumps(ev, ensure_ascii=False) + "\n"

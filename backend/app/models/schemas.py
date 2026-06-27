@@ -88,6 +88,7 @@ class ChatRequest(BaseModel):
     message: str
     doc_id: str | None = None
     jurisdiction: str = "tr"
+    user: str = "misafir"
     history: list[ChatMessage] = []
 
 

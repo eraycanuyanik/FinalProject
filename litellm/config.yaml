@@ -1,0 +1,31 @@
+# LiteLLM proxy yapılandırması.
+# Tüm LLM çağrıları buradan geçer; LiteLLM token sayar ve (sahte) maliyeti hesaplar.
+# Model aslında host'taki LM Studio'dur (ücretsiz/lokal) ama fiyatı GPT-4o gibi
+# gösteriyoruz ki "ChatGPT olsaydı kaç dolar?" görülebilsin.
+
+model_list:
+  - model_name: qwen2.5-coder-7b-instruct-mlx
+    litellm_params:
+      model: openai/qwen2.5-coder-7b-instruct-mlx
+      api_base: http://host.docker.internal:1234/v1
+      api_key: lm-studio
+    model_info:
+      # GPT-4o tarifesi (sanal): $2.50 / 1M giriş, $10 / 1M çıkış token
+      input_cost_per_token: 0.0000025
+      output_cost_per_token: 0.00001
+
+  - model_name: google/gemma-4-e4b
+    litellm_params:
+      model: openai/google/gemma-4-e4b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: lm-studio
+    model_info:
+      input_cost_per_token: 0.0000025
+      output_cost_per_token: 0.00001
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: sk-anlattim-master
+  database_url: "postgresql://litellm:litellm@litellm-db:5432/litellm"

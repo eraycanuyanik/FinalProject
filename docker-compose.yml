@@ -11,8 +11,9 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-lm-studio}
+      # LLM çağrıları LiteLLM proxy üzerinden geçer (token + maliyet takibi için).
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://litellm:4000/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-sk-anlattim-master}
       LLM_MODEL: ${LLM_MODEL:-qwen2.5-coder-7b-instruct-mlx}
       LLM_REQUEST_TIMEOUT: ${LLM_REQUEST_TIMEOUT:-300}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
@@ -30,6 +31,7 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - chromadb
+      - litellm
 
   frontend:
     build:
@@ -57,5 +59,37 @@ services:
       IS_PERSISTENT: "TRUE"
       ANONYMIZED_TELEMETRY: "FALSE"
 
+  # LiteLLM proxy: tüm LLM çağrılarını host LM Studio'ya yönlendirir, token sayar,
+  # (sahte GPT-4o tarifesiyle) maliyet hesaplar. Dashboard: http://localhost:4000/ui
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: anlattim-litellm
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: sk-anlattim-master
+      DATABASE_URL: "postgresql://litellm:litellm@litellm-db:5432/litellm"
+      STORE_MODEL_IN_DB: "True"
+      UI_USERNAME: ${LITELLM_UI_USERNAME:-admin}
+      UI_PASSWORD: ${LITELLM_UI_PASSWORD:-anlattim}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - litellm-db
+
+  litellm-db:
+    image: postgres:16-alpine
+    container_name: anlattim-litellm-db
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm
+      POSTGRES_DB: litellm
+    volumes:
+      - litellm_db:/var/lib/postgresql/data
+
 volumes:
   hf_cache:
+  litellm_db:
