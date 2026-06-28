@@ -11,6 +11,7 @@ import {
   summarizeDocument,
 } from "@/lib/api";
 import RiskHighlighter, { riskColor } from "@/components/RiskHighlighter";
+import { useT } from "@/lib/i18n";
 
 const md = {
   h2: (p: any) => <h2 className="mb-1 mt-3 text-sm font-semibold text-emerald-700" {...p} />,
@@ -22,6 +23,7 @@ const md = {
 };
 
 export default function DocumentCard({ docId, filename }: { docId: string; filename: string }) {
+  const t = useT();
   const [doc, setDoc] = useState<DocumentResponse | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(true);
@@ -81,7 +83,7 @@ export default function DocumentCard({ docId, filename }: { docId: string; filen
         <span className="font-medium text-slate-800">{filename}</span>
         {doc && (
           <span className="ml-auto text-xs text-slate-500">
-            {doc.pages > 0 ? `${doc.pages} sayfa · ` : ""}
+            {doc.pages > 0 ? `${doc.pages} ${t.pages} · ` : ""}
             {doc.method}
             {doc.ocr_used ? " · OCR" : ""} · {doc.jurisdiction.toUpperCase()}
           </span>
@@ -94,10 +96,10 @@ export default function DocumentCard({ docId, filename }: { docId: string; filen
         {/* Sol: özet + riskli maddeler */}
         <div className="border-b border-slate-100 p-4 lg:border-b-0 lg:border-r">
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Sade Özet
+            {t.summary}
           </div>
           {summarizing ? (
-            <p className="text-slate-400">Belge okunuyor ve özetleniyor… (lokal model)</p>
+            <p className="text-slate-400">{t.summarizing}</p>
           ) : (
             summary && (
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={md}>
@@ -108,12 +110,13 @@ export default function DocumentCard({ docId, filename }: { docId: string; filen
 
           <div className="mt-4 border-t border-slate-100 pt-3">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Riskli Maddeler{clauses.length > 0 && ` (${risky.length}/${clauses.length})`}
+              {t.riskyClauses}
+              {clauses.length > 0 && ` (${risky.length}/${clauses.length})`}
             </div>
             {analyzing && (
               <div className="mb-3">
                 <div className="mb-1 text-xs text-slate-500">
-                  Maddeler tek tek inceleniyor… {total > 0 && `${clauses.length}/${total}`}
+                  {t.reviewing} {total > 0 && `${clauses.length}/${total}`}
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
@@ -145,7 +148,7 @@ export default function DocumentCard({ docId, filename }: { docId: string; filen
               })}
             </ul>
             {!analyzing && clauses.length > 0 && risky.length === 0 && (
-              <p className="text-xs text-emerald-600">Belirgin bir riskli madde bulunamadı.</p>
+              <p className="text-xs text-emerald-600">{t.noRisky}</p>
             )}
           </div>
         </div>
@@ -153,11 +156,11 @@ export default function DocumentCard({ docId, filename }: { docId: string; filen
         {/* Sağ: renkli madde-madde belge */}
         <div className="p-4">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Belge — riskli maddeler işaretli{" "}
-            <span className="font-normal normal-case text-slate-400">(üzerine gel → açıklama)</span>
+            {t.docHeading}{" "}
+            <span className="font-normal normal-case text-slate-400">{t.hoverHint}</span>
           </div>
           {clauses.length === 0 ? (
-            <p className="text-slate-400">{analyzing ? "İlk maddeler hazırlanıyor…" : "—"}</p>
+            <p className="text-slate-400">{analyzing ? t.firstClauses : "—"}</p>
           ) : (
             doc && (
               <div className="max-h-[64vh] overflow-auto rounded-lg border border-slate-100 bg-slate-50/50 p-2">

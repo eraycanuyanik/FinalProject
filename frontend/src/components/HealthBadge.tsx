@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 export default function HealthBadge() {
-  const [status, setStatus] = useState<"ok" | "degraded" | "down" | "loading">(
-    "loading"
-  );
+  const t = useT();
+  const [status, setStatus] = useState<"ok" | "degraded" | "down" | "loading">("loading");
 
   useEffect(() => {
     fetch(`${API_URL}/health`)
@@ -16,10 +16,10 @@ export default function HealthBadge() {
   }, []);
 
   const map = {
-    loading: { c: "bg-slate-500", t: "kontrol ediliyor…" },
-    ok: { c: "bg-emerald-400", t: "tüm servisler hazır" },
-    degraded: { c: "bg-amber-400", t: "bazı servisler hazır değil" },
-    down: { c: "bg-rose-500", t: "backend'e ulaşılamıyor" },
+    loading: { c: "bg-slate-400", t: t.checking },
+    ok: { c: "bg-emerald-500", t: t.allReady },
+    degraded: { c: "bg-amber-400", t: t.someNotReady },
+    down: { c: "bg-rose-500", t: t.backendDown },
   }[status];
 
   return (

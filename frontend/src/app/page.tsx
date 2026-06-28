@@ -3,49 +3,13 @@
 import { useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import {
-  ChatMessage,
-  Jurisdiction,
-  LawReference,
-  streamChat,
-  uploadDocument,
-} from "@/lib/api";
-import { JURISDICTIONS, useJurisdiction } from "@/lib/jurisdiction";
+import { ChatMessage, LawReference, streamChat, uploadDocument } from "@/lib/api";
+import { useJurisdiction, useT } from "@/lib/i18n";
 import { useUser } from "@/lib/user";
 import CountrySwitch from "@/components/CountrySwitch";
 import HealthBadge from "@/components/HealthBadge";
 import DocumentCard from "@/components/DocumentCard";
 import UsagePanel from "@/components/UsagePanel";
-
-const COPY: Record<
-  Jurisdiction,
-  { greeting: string; subtitle: string; placeholder: string; chips: string[]; refs: string }
-> = {
-  tr: {
-    greeting: "Hukuki sorununu anlat",
-    subtitle:
-      "Türk mevzuatına dayalı yanıt veririm. Bir sözleşme de yükleyebilirsin — sohbetin içinde analiz ederim.",
-    placeholder: "Sorunu yaz ya da bir sözleşme yükle…",
-    chips: [
-      "Ev sahibi kiramı ne kadar artırabilir?",
-      "İstifa edersem kıdem tazminatı alır mıyım?",
-      "İnternetten aldığım üründe cayma hakkım var mı?",
-    ],
-    refs: "İlgili mevzuat",
-  },
-  us: {
-    greeting: "Describe your legal question",
-    subtitle:
-      "I answer based on U.S. law. You can also upload a contract — I'll analyze it right in the chat.",
-    placeholder: "Ask a question or upload a contract…",
-    chips: [
-      "Can my landlord keep my security deposit?",
-      "Am I entitled to overtime pay?",
-      "What is an implied warranty of merchantability?",
-    ],
-    refs: "Relevant law",
-  },
-};
 
 type Item =
   | { id: number; kind: "user"; text: string }
@@ -54,6 +18,7 @@ type Item =
 
 export default function Home() {
   const [jurisdiction, setJurisdiction] = useJurisdiction();
+  const t = useT();
   const [user, setUser, userReady] = useUser();
   const [nameInput, setNameInput] = useState("");
 
@@ -69,7 +34,6 @@ export default function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const copy = COPY[jurisdiction];
   const nextId = () => ++idRef.current;
   const bumpUsage = () => setUsageKey((k) => k + 1);
   const scrollDown = () =>
@@ -148,15 +112,13 @@ export default function Home() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-2xl text-white">
             ⚖
           </div>
-          <h1 className="text-xl font-bold text-slate-800">Anlattım’a hoş geldin</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Seni nasıl çağıralım? (Maliyet panosunda bu adla görünürsün.)
-          </p>
+          <h1 className="text-xl font-bold text-slate-800">{t.welcome}</h1>
+          <p className="mt-2 text-sm text-slate-500">{t.welcomeSub}</p>
           <input
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && nameInput.trim() && setUser(nameInput)}
-            placeholder="Adın"
+            placeholder={t.yourName}
             className="mt-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
           />
           <button
@@ -164,7 +126,7 @@ export default function Home() {
             disabled={!nameInput.trim()}
             className="mt-3 w-full rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
           >
-            Başla
+            {t.start}
           </button>
         </div>
       </div>
@@ -193,7 +155,7 @@ export default function Home() {
         <div className="flex items-center gap-2 text-lg font-semibold">
           <span>⚖</span> Anlattım
           <span className="ml-2 hidden text-xs font-normal text-emerald-100 sm:inline">
-            lokal hukuk asistanı
+            {t.tagline}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -201,7 +163,7 @@ export default function Home() {
           <button
             onClick={() => setUser("")}
             className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur transition hover:bg-white/25"
-            title="Kullanıcıyı değiştir"
+            title={t.changeUser}
           >
             {user}
           </button>
@@ -215,14 +177,14 @@ export default function Home() {
             onClick={newChat}
             className="mb-4 w-full rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
-            + Yeni sohbet
+            {t.newChat}
           </button>
           <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Belgeler
+            {t.documents}
           </div>
           <div className="flex-1 space-y-1 overflow-auto">
             {docs.length === 0 ? (
-              <p className="px-1 text-xs text-slate-400">Henüz belge yüklemedin.</p>
+              <p className="px-1 text-xs text-slate-400">{t.noDocs}</p>
             ) : (
               docs.map((d) => (
                 <a
@@ -250,10 +212,10 @@ export default function Home() {
                   <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 text-3xl text-white shadow-lg">
                     💬
                   </div>
-                  <h1 className="text-2xl font-bold text-slate-800">{copy.greeting}</h1>
-                  <p className="mt-2 max-w-md text-sm text-slate-500">{copy.subtitle}</p>
+                  <h1 className="text-2xl font-bold text-slate-800">{t.greeting}</h1>
+                  <p className="mt-2 max-w-md text-sm text-slate-500">{t.subtitle}</p>
                   <div className="mt-6 flex flex-wrap justify-center gap-2">
-                    {copy.chips.map((c) => (
+                    {t.chips.map((c) => (
                       <button
                         key={c}
                         onClick={() => ask(c)}
@@ -286,7 +248,7 @@ export default function Home() {
                             it.text ? (
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>{it.text}</ReactMarkdown>
                             ) : (
-                              <span className="cursor-blink text-slate-400">Yanıt yazıyor</span>
+                              <span className="cursor-blink text-slate-400">{t.typing}</span>
                             )
                           ) : (
                             it.text
@@ -294,7 +256,7 @@ export default function Home() {
                         </div>
                         {it.kind === "assistant" && it.references && it.references.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            <span className="text-xs text-slate-400">{copy.refs}:</span>
+                            <span className="text-xs text-slate-400">{t.refs}:</span>
                             {it.references.slice(0, 4).map((r, j) => (
                               <span
                                 key={j}
@@ -322,7 +284,7 @@ export default function Home() {
               )}
               {docContext && (
                 <div className="mb-2 inline-flex items-center gap-2 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs text-emerald-700">
-                  📄 “{docContext.name}” bağlamında soruyorsun
+                  📄 {t.askingAbout(docContext.name)}
                   <button
                     onClick={() => setDocContext(null)}
                     className="text-emerald-500 hover:text-emerald-800"
@@ -349,7 +311,7 @@ export default function Home() {
                 <button
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
-                  title="Sözleşme yükle"
+                  title={t.uploadTitle}
                   className="text-lg text-slate-400 transition hover:text-emerald-600 disabled:opacity-50"
                 >
                   {uploading ? "…" : "📎"}
@@ -358,7 +320,7 @@ export default function Home() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && ask(input)}
-                  placeholder={copy.placeholder}
+                  placeholder={t.placeholder}
                   disabled={busy}
                   className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                 />
@@ -366,14 +328,13 @@ export default function Home() {
                   onClick={() => ask(input)}
                   disabled={busy || !input.trim()}
                   className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white transition hover:opacity-90 disabled:opacity-40"
-                  title="Gönder"
+                  title={t.send}
                 >
                   ↑
                 </button>
               </div>
               <p className="mt-2 text-center text-xs text-slate-400">
-                {JURISDICTIONS[jurisdiction].label} · {JURISDICTIONS[jurisdiction].lang} · yanıtlar
-                bilgilendirme amaçlıdır
+                {t.country[jurisdiction]} · {t.langName[jurisdiction]} · {t.disclaimer}
               </p>
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { ClauseRisk } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 
 export function riskColor(score: number) {
   if (score >= 76)
@@ -13,6 +14,7 @@ export function riskColor(score: number) {
 }
 
 function ClauseBlock({ clause }: { clause: ClauseRisk }) {
+  const t = useT();
   const c = riskColor(clause.risk_skoru);
   return (
     <div
@@ -37,19 +39,19 @@ function ClauseBlock({ clause }: { clause: ClauseRisk }) {
         </div>
         {clause.ozet && (
           <p className="mb-2 text-sm text-slate-700">
-            <span className="font-semibold">Ne diyor: </span>
+            <span className="font-semibold">{t.whatSays} </span>
             {clause.ozet}
           </p>
         )}
         {clause.aciklama && (
           <p className="text-sm text-slate-600">
-            <span className="font-semibold">Neden önemli: </span>
+            <span className="font-semibold">{t.whyMatters} </span>
             {clause.aciklama}
           </p>
         )}
         {clause.references?.length > 0 && (
           <div className="mt-2 border-t border-slate-100 pt-2">
-            <p className="mb-1 text-xs font-semibold text-slate-500">İlgili mevzuat</p>
+            <p className="mb-1 text-xs font-semibold text-slate-500">{t.relatedLaw}</p>
             <ul className="space-y-0.5">
               {clause.references.slice(0, 3).map((r, i) => (
                 <li key={i} className="text-xs text-emerald-700">
