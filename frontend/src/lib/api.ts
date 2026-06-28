@@ -159,6 +159,56 @@ export async function streamAnalyze(
   }
 }
 
+export async function streamChat(
+  params: {
+    message: string;
+    history: ChatMessage[];
+    docId?: string;
+    jurisdiction?: Jurisdiction;
+    user?: string;
+  },
+  handlers: {
+    onMeta?: (references: LawReference[]) => void;
+    onDelta?: (text: string) => void;
+    onDone?: () => void;
+  }
+): Promise<void> {
+  const res = await fetch(`${API_URL}/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: params.message,
+      history: params.history,
+      doc_id: params.docId,
+      jurisdiction: params.jurisdiction ?? "tr",
+      user: params.user || "misafir",
+    }),
+  });
+  if (!res.ok || !res.body) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const ev = JSON.parse(line);
+      if (ev.type === "meta") handlers.onMeta?.(ev.references || []);
+      else if (ev.type === "delta") handlers.onDelta?.(ev.text);
+      else if (ev.type === "done") handlers.onDone?.();
+      else if (ev.type === "error") throw new Error(ev.detail || "Sohbet hatası");
+    }
+  }
+}
+
 export async function analyzeDocument(id: string): Promise<AnalyzeResponse> {
   const res = await fetch(`${API_URL}/documents/${id}/analyze`, {
     method: "POST",

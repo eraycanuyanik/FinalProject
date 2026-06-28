@@ -64,5 +64,45 @@ class LLMClient:
             data = resp.json()
             return data["choices"][0]["message"]["content"]
 
+    async def chat_stream(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.3,
+        user: str | None = None,
+    ):
+        """Yanıtı parça parça (token) akıtır. content delta'larını yield eder."""
+        import json as _json
+
+        payload: dict = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "stream": True,
+        }
+        if user:
+            payload["user"] = user
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers=self._headers,
+                json=payload,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = _json.loads(data)
+                        delta = chunk["choices"][0].get("delta", {}).get("content")
+                        if delta:
+                            yield delta
+                    except Exception:  # noqa: BLE001 — bozuk parçayı atla
+                        continue
+
 
 llm_client = LLMClient()

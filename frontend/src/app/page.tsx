@@ -8,14 +8,14 @@ import {
   ChatMessage,
   Jurisdiction,
   LawReference,
-  sendChat,
+  streamChat,
   uploadDocument,
 } from "@/lib/api";
 import { JURISDICTIONS, useJurisdiction } from "@/lib/jurisdiction";
 import { useUser } from "@/lib/user";
 import CountrySwitch from "@/components/CountrySwitch";
 import HealthBadge from "@/components/HealthBadge";
-import DocumentAnalysis from "@/components/DocumentAnalysis";
+import DocumentCard from "@/components/DocumentCard";
 
 const COPY: Record<
   Jurisdiction,
@@ -24,7 +24,7 @@ const COPY: Record<
   tr: {
     greeting: "Hukuki sorununu anlat",
     subtitle:
-      "Türk mevzuatına dayalı yanıt veririm. İstersen bir sözleşme yükle, riskli maddeleri işaretleyeyim.",
+      "Türk mevzuatına dayalı yanıt veririm. Bir sözleşme de yükleyebilirsin — sohbetin içinde analiz ederim.",
     placeholder: "Sorunu yaz ya da bir sözleşme yükle…",
     chips: [
       "Ev sahibi kiramı ne kadar artırabilir?",
@@ -36,7 +36,7 @@ const COPY: Record<
   us: {
     greeting: "Describe your legal question",
     subtitle:
-      "I answer based on U.S. law. You can also upload a contract and I'll flag risky clauses.",
+      "I answer based on U.S. law. You can also upload a contract — I'll analyze it right in the chat.",
     placeholder: "Ask a question or upload a contract…",
     chips: [
       "Can my landlord keep my security deposit?",
@@ -47,44 +47,89 @@ const COPY: Record<
   },
 };
 
-type Turn = ChatMessage & { references?: LawReference[] };
+type Item =
+  | { id: number; kind: "user"; text: string }
+  | { id: number; kind: "assistant"; text: string; references?: LawReference[] }
+  | { id: number; kind: "doc"; docId: string; filename: string };
 
 export default function Home() {
   const [jurisdiction, setJurisdiction] = useJurisdiction();
   const [user, setUser, userReady] = useUser();
   const [nameInput, setNameInput] = useState("");
 
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [activeDocId, setActiveDocId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [docContext, setDocContext] = useState<{ id: string; name: string } | null>(null);
+  const idRef = useRef(0);
+  const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const copy = COPY[jurisdiction];
+  const nextId = () => ++idRef.current;
+  const scrollDown = () =>
+    setTimeout(() => scrollRef.current?.scrollTo({ top: 1e9, behavior: "smooth" }), 60);
+
+  function refsChips(references?: LawReference[]) {
+    if (!references || references.length === 0) return null;
+    return (
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <span className="text-xs text-slate-500">{copy.refs}:</span>
+        {references.slice(0, 4).map((r, j) => (
+          <span
+            key={j}
+            title={r.snippet}
+            className="cursor-help rounded bg-slate-800 px-1.5 py-0.5 text-xs text-emerald-300"
+          >
+            {r.kanun_adi.split(" ")[0]} {r.madde_no}
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   async function ask(question: string) {
     const q = question.trim();
     if (!q || busy) return;
     setError(null);
     setInput("");
-    const history: ChatMessage[] = turns.map((t) => ({ role: t.role, content: t.content }));
-    setTurns((p) => [...p, { role: "user", content: q }]);
+
+    const history: ChatMessage[] = items
+      .filter((it): it is Extract<Item, { kind: "user" | "assistant" }> =>
+        it.kind === "user" || it.kind === "assistant"
+      )
+      .map((it) => ({ role: it.kind, content: it.text }));
+
+    setItems((p) => [...p, { id: nextId(), kind: "user", text: q }]);
+    const aId = nextId();
+    setItems((p) => [...p, { id: aId, kind: "assistant", text: "" }]);
     setBusy(true);
+    scrollDown();
+
     try {
-      const res = await sendChat({ message: q, history, jurisdiction, user });
-      setTurns((p) => [
-        ...p,
-        { role: "assistant", content: res.answer, references: res.references },
-      ]);
+      await streamChat(
+        { message: q, history, jurisdiction, user, docId: docContext?.id },
+        {
+          onMeta: (references) =>
+            setItems((p) =>
+              p.map((it) => (it.id === aId && it.kind === "assistant" ? { ...it, references } : it))
+            ),
+          onDelta: (text) =>
+            setItems((p) =>
+              p.map((it) =>
+                it.id === aId && it.kind === "assistant" ? { ...it, text: it.text + text } : it
+              )
+            ),
+        }
+      );
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     } finally {
       setBusy(false);
-      setTimeout(() => scrollRef.current?.scrollTo({ top: 1e9, behavior: "smooth" }), 50);
+      scrollDown();
     }
   }
 
@@ -93,7 +138,12 @@ export default function Home() {
     setUploading(true);
     try {
       const res = await uploadDocument(file, jurisdiction, user);
-      setActiveDocId(res.id);
+      setItems((p) => [
+        ...p,
+        { id: nextId(), kind: "doc", docId: res.id, filename: res.filename },
+      ]);
+      setDocContext({ id: res.id, name: res.filename });
+      scrollDown();
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
     } finally {
@@ -101,7 +151,6 @@ export default function Home() {
     }
   }
 
-  // --- Kullanıcı adı kapısı ---
   if (userReady && !user) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -109,7 +158,7 @@ export default function Home() {
           <div className="mb-3 text-3xl">⚖️</div>
           <h1 className="text-xl font-bold">Anlattım’a hoş geldin</h1>
           <p className="mt-2 text-sm text-slate-400">
-            Seni nasıl çağıralım? (Kullanım/maliyet panosunda bu adla görünürsün.)
+            Seni nasıl çağıralım? (Maliyet panosunda bu adla görünürsün.)
           </p>
           <input
             value={nameInput}
@@ -130,16 +179,7 @@ export default function Home() {
     );
   }
 
-  // --- Belge analiz görünümü (aynı ekranda, sayfa değişmeden) ---
-  if (activeDocId) {
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-6">
-        <DocumentAnalysis docId={activeDocId} onBack={() => setActiveDocId(null)} />
-      </main>
-    );
-  }
-
-  const started = turns.length > 0;
+  const started = items.length > 0;
 
   return (
     <main
@@ -158,7 +198,10 @@ export default function Home() {
     >
       <header className="flex items-center justify-between py-4">
         <button
-          onClick={() => setTurns([])}
+          onClick={() => {
+            setItems([]);
+            setDocContext(null);
+          }}
           className="flex items-center gap-2 text-lg font-semibold"
           title="Yeni sohbet"
         >
@@ -198,38 +241,29 @@ export default function Home() {
           </div>
         ) : (
           <div className="space-y-4">
-            {turns.map((t, i) => (
-              <div key={i} className={t.role === "user" ? "text-right" : ""}>
-                <div
-                  className={`inline-block max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                    t.role === "user"
-                      ? "bg-emerald-600 text-white"
-                      : "bg-slate-800 text-slate-200"
-                  }`}
-                >
-                  {t.role === "assistant" ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.content}</ReactMarkdown>
-                  ) : (
-                    t.content
-                  )}
-                </div>
-                {t.role === "assistant" && t.references && t.references.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    <span className="text-xs text-slate-500">{copy.refs}:</span>
-                    {t.references.slice(0, 4).map((r, j) => (
-                      <span
-                        key={j}
-                        title={r.snippet}
-                        className="cursor-help rounded bg-slate-800 px-1.5 py-0.5 text-xs text-emerald-300"
-                      >
-                        {r.kanun_adi.split(" ")[0]} {r.madde_no}
-                      </span>
-                    ))}
+            {items.map((it) => {
+              if (it.kind === "doc") return <DocumentCard key={it.id} docId={it.docId} filename={it.filename} />;
+              return (
+                <div key={it.id} className={it.kind === "user" ? "text-right" : ""}>
+                  <div
+                    className={`inline-block max-w-[85%] rounded-2xl px-4 py-2.5 text-left text-sm ${
+                      it.kind === "user" ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-200"
+                    }`}
+                  >
+                    {it.kind === "assistant" ? (
+                      it.text ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{it.text}</ReactMarkdown>
+                      ) : (
+                        <span className="text-slate-400">Yanıt yazıyor…</span>
+                      )
+                    ) : (
+                      it.text
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-            {busy && <p className="text-sm text-slate-400">Yanıt hazırlanıyor… (lokal model)</p>}
+                  {it.kind === "assistant" && refsChips(it.references)}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -237,13 +271,21 @@ export default function Home() {
       {error && <p className="mb-2 rounded-md bg-rose-500/10 p-2 text-sm text-rose-300">{error}</p>}
 
       <div className="sticky bottom-0 pb-4">
+        {docContext && (
+          <div className="mb-2 inline-flex items-center gap-2 rounded-lg bg-slate-800 px-2.5 py-1 text-xs text-slate-300">
+            📄 “{docContext.name}” bağlamında soruyorsun
+            <button onClick={() => setDocContext(null)} className="text-slate-500 hover:text-slate-200">
+              ✕
+            </button>
+          </div>
+        )}
         <div
           className={`flex items-center gap-2 rounded-2xl border bg-slate-900/80 px-3 py-2 backdrop-blur ${
             dragging ? "border-emerald-400" : "border-slate-700"
           }`}
         >
           <input
-            ref={inputRef}
+            ref={fileRef}
             type="file"
             accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,.tiff,.bmp"
             className="hidden"
@@ -253,7 +295,7 @@ export default function Home() {
             }}
           />
           <button
-            onClick={() => inputRef.current?.click()}
+            onClick={() => fileRef.current?.click()}
             disabled={uploading}
             title="Sözleşme yükle"
             className="text-slate-400 hover:text-slate-200 disabled:opacity-50"
