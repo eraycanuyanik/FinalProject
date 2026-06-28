@@ -91,6 +91,39 @@ async def rag_status() -> dict:
     }
 
 
+@app.get("/usage")
+async def usage(user: str = "misafir") -> dict:
+    """Bir kullanıcının LiteLLM'deki toplam token & (sanal) maliyetini döndürür."""
+    base = settings.llm_base_url.rstrip("/")
+    if base.endswith("/v1"):
+        base = base[: -len("/v1")]
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                f"{base}/spend/logs",
+                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+            )
+            resp.raise_for_status()
+            logs = resp.json()
+    except Exception:  # noqa: BLE001
+        return {"user": user, "requests": 0, "total_tokens": 0, "cost_usd": 0.0, "available": False}
+
+    reqs = tokens = 0
+    cost = 0.0
+    for r in logs:
+        if (r.get("end_user") or "") == user:
+            reqs += 1
+            tokens += r.get("total_tokens") or 0
+            cost += r.get("spend") or 0.0
+    return {
+        "user": user,
+        "requests": reqs,
+        "total_tokens": tokens,
+        "cost_usd": round(cost, 6),
+        "available": True,
+    }
+
+
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"app": "Anlattım API", "docs": "/docs", "health": "/health"}

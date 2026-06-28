@@ -3,11 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --background: #0b0f17;
-  --foreground: #e6edf3;
+  --background: #f6f8fb;
+  --foreground: #0f172a;
+}
+
+html,
+body {
+  min-height: 100%;
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
+  background: linear-gradient(135deg, #ecfdf5 0%, #f6f8fb 45%, #eff6ff 100%);
+  background-attachment: fixed;
+}
+
+/* Yumuşak kaydırma çubuğu */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Akan yanıt için yanıp sönen imleç */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor-blink::after {
+  content: "▍";
+  animation: blink 1s step-end infinite;
+  color: #10b981;
 }

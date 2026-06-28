@@ -54,6 +54,20 @@ export type AnalyzeResponse = {
 
 export type Jurisdiction = "tr" | "us";
 
+export type Usage = {
+  user: string;
+  requests: number;
+  total_tokens: number;
+  cost_usd: number;
+  available: boolean;
+};
+
+export async function getUsage(user: string): Promise<Usage> {
+  const res = await fetch(`${API_URL}/usage?user=${encodeURIComponent(user)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function uploadDocument(
   file: File,
   jurisdiction: Jurisdiction = "tr",

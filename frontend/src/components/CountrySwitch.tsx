@@ -11,7 +11,7 @@ export default function CountrySwitch({
   onChange: (j: Jurisdiction) => void;
 }) {
   return (
-    <div className="inline-flex overflow-hidden rounded-lg border border-slate-700 text-sm">
+    <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-sm shadow-sm">
       {(Object.keys(JURISDICTIONS) as Jurisdiction[]).map((j) => {
         const active = j === value;
         return (
@@ -20,8 +20,8 @@ export default function CountrySwitch({
             onClick={() => onChange(j)}
             className={`px-3 py-1.5 transition ${
               active
-                ? "bg-emerald-600 font-medium text-white"
-                : "text-slate-400 hover:bg-slate-800"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-500 font-medium text-white"
+                : "text-slate-500 hover:bg-slate-100"
             }`}
             title={JURISDICTIONS[j].label}
           >
